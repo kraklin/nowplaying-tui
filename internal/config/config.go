@@ -56,45 +56,16 @@ func Default() Config {
 	}
 }
 
-const (
-	appDir = "nowplaying"
-	// legacyDir is what the app was called before it was renamed.
-	legacyDir = "nowplay"
-)
-
-func pathIn(dir string) (string, error) {
+// Path is $XDG_CONFIG_HOME/nowplaying/config.toml, or ~/.config/nowplaying/config.toml.
+func Path() (string, error) {
 	if cfg := os.Getenv("XDG_CONFIG_HOME"); cfg != "" {
-		return filepath.Join(cfg, dir, "config.toml"), nil
+		return filepath.Join(cfg, "nowplaying", "config.toml"), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".config", dir, "config.toml"), nil
-}
-
-// Path is $XDG_CONFIG_HOME/nowplaying/config.toml, or ~/.config/nowplaying/config.toml.
-func Path() (string, error) { return pathIn(appDir) }
-
-// LegacyPath is where the config lived before the app was renamed from nowplay.
-func LegacyPath() (string, error) { return pathIn(legacyDir) }
-
-// DefaultFile is the file to load when no --config is given: Path, or the legacy
-// file if only that exists. The legacy file is only read, never moved.
-func DefaultFile() (string, error) {
-	p, err := Path()
-	if err != nil {
-		return "", err
-	}
-	if _, err := os.Stat(p); err == nil {
-		return p, nil
-	}
-	if lp, lerr := LegacyPath(); lerr == nil {
-		if _, err := os.Stat(lp); err == nil {
-			return lp, nil
-		}
-	}
-	return p, nil
+	return filepath.Join(home, ".config", "nowplaying", "config.toml"), nil
 }
 
 // Load reads path. A missing file gives the defaults and no warnings. Anything

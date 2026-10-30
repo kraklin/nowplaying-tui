@@ -49,16 +49,6 @@ func TestLoadConfigDefaultsAndExplicitPath(t *testing.T) {
 	}
 }
 
-func TestLoadConfigStillReadsTheOldFolder(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	os.MkdirAll(filepath.Join(dir, "nowplay"), 0o755)
-	os.WriteFile(filepath.Join(dir, "nowplay", "config.toml"), []byte("icons = \"basic\"\n"), 0o644)
-	if cfg, warns := loadConfig(""); cfg.Icons != "basic" || len(warns) != 0 {
-		t.Errorf("a config from before the rename should still apply: %+v %v", cfg, warns)
-	}
-}
-
 func TestVersionString(t *testing.T) {
 	old := version
 	defer func() { version = old }()

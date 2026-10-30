@@ -117,9 +117,6 @@ func wire(demo bool, cfg config.Config, warnings []string) (source.Source, ui.De
 		return src, deps, nil
 	}
 	store := history.NewStore(path, cfg.HistorySize)
-	if legacy, err := history.LegacyPath(); err == nil {
-		store.Legacy = legacy
-	}
 	deps.History = store
 	recent, err := store.Load()
 	if err != nil {
@@ -135,7 +132,7 @@ func loadConfig(flagPath string) (config.Config, []string) {
 	path := flagPath
 	if path == "" {
 		var err error
-		if path, err = config.DefaultFile(); err != nil {
+		if path, err = config.Path(); err != nil {
 			return config.Default(), nil
 		}
 	} else if _, err := os.Stat(path); err != nil {

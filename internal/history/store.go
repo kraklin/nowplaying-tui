@@ -12,30 +12,18 @@ import (
 // DefaultSize is how many entries the history keeps.
 const DefaultSize = 50
 
-const (
-	appDir = "nowplaying"
-	// legacyDir is what the app was called before it was renamed; data from
-	// there is still picked up (never modified or deleted).
-	legacyDir = "nowplay"
-)
-
-func pathIn(dir string) (string, error) {
+// DefaultPath is $XDG_STATE_HOME/nowplaying/history.json, falling back to
+// ~/Library/Application Support/nowplaying/history.json.
+func DefaultPath() (string, error) {
 	if state := os.Getenv("XDG_STATE_HOME"); state != "" {
-		return filepath.Join(state, dir, "history.json"), nil
+		return filepath.Join(state, "nowplaying", "history.json"), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, "Library", "Application Support", dir, "history.json"), nil
+	return filepath.Join(home, "Library", "Application Support", "nowplaying", "history.json"), nil
 }
-
-// DefaultPath is $XDG_STATE_HOME/nowplaying/history.json, falling back to
-// ~/Library/Application Support/nowplaying/history.json.
-func DefaultPath() (string, error) { return pathIn(appDir) }
-
-// LegacyPath is where the history lived before the app was renamed from nowplay.
-func LegacyPath() (string, error) { return pathIn(legacyDir) }
 
 // ErrCorrupt is returned by Load when the file could not be parsed. The file
 // is moved aside to history.json.corrupt and Load returns an empty list.
@@ -51,9 +39,7 @@ type file struct {
 // disk: a save older than one already written is dropped.
 type Store struct {
 	Path string
-	// Legacy, if set, is read when Path does not exist yet. It is never written.
-	Legacy string
-	Max    int
+	Max  int
 
 	mu   sync.Mutex
 	last uint64
@@ -67,40 +53,26 @@ func NewStore(path string, max int) *Store {
 	return &Store{Path: path, Max: max}
 }
 
-// Load reads the list, newest first. A missing file is an empty list, unless
-// Legacy exists: then that is read, and the next Save writes Path.
+// Load reads the list, newest first. A missing file is an empty list; a file
+// that cannot be parsed is moved to history.json.corrupt and also gives an empty
+// list, with ErrCorrupt.
 func (s *Store) Load() ([]Entry, error) {
-	entries, found, err := read(s.Path, true)
-	if !found && err == nil && s.Legacy != "" {
-		// An unreadable legacy file is ignored rather than moved aside: it is not ours to touch.
-		if old, ok, lerr := read(s.Legacy, false); ok && lerr == nil {
-			entries = old
-		}
-	}
-	if len(entries) > s.Max {
-		entries = entries[:s.Max]
-	}
-	return entries, err
-}
-
-// read parses path. moveAside moves an unparseable file to path+".corrupt".
-func read(path string, moveAside bool) (entries []Entry, found bool, err error) {
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(s.Path)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, false, nil
+		return nil, nil
 	}
 	if err != nil {
-		return nil, true, err
+		return nil, err
 	}
 	var f file
 	if err := json.Unmarshal(b, &f); err != nil {
-		if moveAside {
-			_ = os.Rename(path, path+".corrupt")
-			return nil, true, fmt.Errorf("%w: moved to %s.corrupt: %v", ErrCorrupt, path, err)
-		}
-		return nil, true, fmt.Errorf("%w: %v", ErrCorrupt, err)
+		_ = os.Rename(s.Path, s.Path+".corrupt")
+		return nil, fmt.Errorf("%w: moved to %s.corrupt: %v", ErrCorrupt, s.Path, err)
 	}
-	return f.Entries, true, nil
+	if len(f.Entries) > s.Max {
+		f.Entries = f.Entries[:s.Max]
+	}
+	return f.Entries, nil
 }
 
 // Save atomically replaces the file (temp file + rename).
