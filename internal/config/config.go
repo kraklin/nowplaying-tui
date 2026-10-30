@@ -16,13 +16,19 @@ import (
 )
 
 type Config struct {
+	// ShowCover false hides the cover and shows only the text.
+	ShowCover      bool   `toml:"show_cover"`
 	ArtMaxPx       int    `toml:"art_max_px"`
 	QuantizeColors int    `toml:"quantize_colors"`
 	Scanlines      bool   `toml:"scanlines"`
 	Accent         string `toml:"accent"`
 	Icons          string `toml:"icons"`
 	HistorySize    int    `toml:"history_size"`
-	MinPlaySeconds int    `toml:"min_play_seconds"`
+	// ShowHistory false hides the recently played list at start (r toggles it).
+	ShowHistory bool `toml:"show_history"`
+	// HistoryFade false draws every history row at full strength.
+	HistoryFade    bool `toml:"history_fade"`
+	MinPlaySeconds int  `toml:"min_play_seconds"`
 	// Background is the terminal background as "#rrggbb". When set, nowplaying
 	// does not ask the terminal for it.
 	Background string `toml:"background"`
@@ -30,11 +36,14 @@ type Config struct {
 
 func Default() Config {
 	return Config{
+		ShowCover:      true,
+		ShowHistory:    true,
+		HistoryFade:    true,
 		ArtMaxPx:       32,
 		QuantizeColors: 12,
 		Scanlines:      true,
 		Icons:          "unicode",
-		HistorySize:    50,
+		HistorySize:    10,
 		MinPlaySeconds: 10,
 	}
 }

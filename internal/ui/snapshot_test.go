@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
+	"github.com/tomaslatall/nowplaying-tui/internal/config"
 	"github.com/tomaslatall/nowplaying-tui/internal/source"
 )
 
@@ -35,6 +36,7 @@ func TestWriteSnapshots(t *testing.T) {
 	write("wide", withVolume(settleBG(t, 90, 22, false, bg)))
 	write("stacked", withVolume(settleBG(t, 56, 36, false, bg)))
 	write("idle", withVolume(settleBG(t, 90, 22, true, bg)))
+	write("text", withVolume(settleFull(t, 80, 17, false, bg, cfgWith(func(c *config.Config) { c.ShowCover = false }))))
 
 	missing := settleBG(t, 90, 16, true, bg)
 	tm, _ := missing.Update(StateMsg(source.State{Status: source.StatusMissing}))

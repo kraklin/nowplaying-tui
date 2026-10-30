@@ -108,8 +108,10 @@ func TestLayoutInvariantsAcrossSizes(t *testing.T) {
 				if l.mode != textOnly {
 					t.Errorf("%dx%d: under 40 cols or 12 rows the cover is hidden", w, hgt)
 				}
-			case l.mode == sideBySide && w < 70, l.mode == stacked && w >= 70:
-				t.Errorf("%dx%d: mode %v violates the 70-column breakpoint", w, hgt, l.mode)
+			case l.mode == sideBySide && (w < 70 || hgt*2 > w):
+				t.Errorf("%dx%d: side by side needs 70+ columns and a landscape pane", w, hgt)
+			case l.mode == stacked && w >= 70 && hgt*2 <= w:
+				t.Errorf("%dx%d: a wide landscape pane should not stack", w, hgt)
 			}
 			if l.coverPx != 0 {
 				if l.coverPx%2 != 0 || l.coverPx < 8 || l.coverPx > h.m.cfg.ArtMaxPx {

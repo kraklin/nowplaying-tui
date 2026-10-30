@@ -23,7 +23,10 @@ type Result struct {
 	Accent   string // "#rrggbb"
 }
 
-const placeholderAccent = "#c9a7ff"
+const (
+	placeholderAccent = "#c9a7ff"
+	accentSample      = 32 // px the cover is downscaled to for picking the accent
+)
 
 func Hash(data []byte) string {
 	sum := sha1.Sum(data)
@@ -48,8 +51,11 @@ func Build(data []byte, px int, o Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	small := resize(cropSquare(src), px)
-	ac := hexColor(ensureContrast(pickAccent(small), o.BG))
+	square := cropSquare(src)
+	// The accent is sampled at a fixed size so it depends on the artwork, not on how
+	// big the cover happens to be drawn (or whether it is drawn at all).
+	ac := hexColor(ensureContrast(pickAccent(resize(square, accentSample)), o.BG))
+	small := resize(square, px)
 	quantize(small, o.Quantize)
 	if o.Scanlines {
 		scanlines(small)

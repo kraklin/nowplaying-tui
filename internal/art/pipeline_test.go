@@ -316,3 +316,50 @@ func TestRealCovers(t *testing.T) {
 		t.Errorf("different covers rendered identically")
 	}
 }
+
+// The accent describes the artwork, so it must not change with the size the
+// cover is drawn at (resizing a pane, or hiding the cover).
+func TestAccentDoesNotDependOnCoverSize(t *testing.T) {
+	for name, img := range sampleCovers() {
+		data := encodePNG(t, img)
+		var want string
+		for _, px := range []int{8, 16, 24, 28, 32, 48, 64} {
+			res, err := Build(data, px, DefaultOptions(DarkBG))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want == "" {
+				want = res.Accent
+			}
+			if res.Accent != want {
+				t.Errorf("%s: accent %s at %dpx but %s at 8px", name, res.Accent, px, want)
+			}
+		}
+	}
+}
+
+func TestAccentOfRealCoversDoesNotDependOnSize(t *testing.T) {
+	f, err := os.ReadFile("../../testdata/stream.jsonl")
+	if err != nil {
+		t.Skip("no recording")
+	}
+	var m source.Merger
+	var cover []byte
+	for _, line := range bytes.Split(f, []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		st, err := m.Apply(line)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(st.Art) > 0 {
+			cover = st.Art
+		}
+	}
+	a, _ := Build(cover, 16, DefaultOptions(DarkBG))
+	b, _ := Build(cover, 44, DefaultOptions(DarkBG))
+	if a.Accent != b.Accent {
+		t.Errorf("real cover: %s at 16px vs %s at 44px", a.Accent, b.Accent)
+	}
+}

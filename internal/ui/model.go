@@ -117,6 +117,7 @@ type Model struct {
 
 	cfg          config.Config
 	help         bool
+	showHistory  bool
 	tracker      *history.Tracker
 	histMax      int
 	histSeq      uint64
@@ -132,20 +133,21 @@ func New(states <-chan source.State, recent []history.Entry, bg color.RGBA, deps
 	opts := art.DefaultOptions(bg)
 	opts.Quantize, opts.Scanlines = cfg.QuantizeColors, cfg.Scanlines
 	m := Model{
-		cfg:     cfg,
-		tracker: history.NewTracker(time.Duration(cfg.MinPlaySeconds) * time.Second),
-		histMax: cfg.HistorySize,
-		src:     states,
-		deps:    deps,
-		clock:   time.Now,
-		recent:  recent,
-		volume:  -1,
-		now:     time.Now(),
-		cache:   map[artKey]art.Result{},
-		pending: map[artKey]bool{},
-		icons:   iconSet(cfg.Icons),
-		opts:    opts,
-		th:      newTheme(bg),
+		cfg:         cfg,
+		showHistory: cfg.ShowHistory,
+		tracker:     history.NewTracker(time.Duration(cfg.MinPlaySeconds) * time.Second),
+		histMax:     cfg.HistorySize,
+		src:         states,
+		deps:        deps,
+		clock:       time.Now,
+		recent:      recent,
+		volume:      -1,
+		now:         time.Now(),
+		cache:       map[artKey]art.Result{},
+		pending:     map[artKey]bool{},
+		icons:       iconSet(cfg.Icons),
+		opts:        opts,
+		th:          newTheme(bg),
 	}
 	if len(deps.Warnings) > 0 {
 		m.setNoteFor(deps.Warnings[0], warnFor)
@@ -193,17 +195,22 @@ func renderArt(key artKey, data []byte, opts art.Options) tea.Cmd {
 	}
 }
 
+// accentPx is the size cover that is built just to pick the accent colour when no
+// cover is shown (text-only mode, or a pane too small for one).
+const accentPx = 16
+
 // wantArt returns the cache key for the cover the current state and layout need.
+// Without a visible cover it is a small one, so the accent still follows the music.
 func (m Model) wantArt() (artKey, bool) {
-	l := m.layout()
-	if l.coverPx == 0 {
-		return artKey{}, false
+	px := m.layout().coverPx
+	if px == 0 {
+		px = accentPx
 	}
 	hash := placeholderHash
 	if !m.state.Empty() && len(m.state.Art) > 0 {
 		hash = art.Hash(m.state.Art)
 	}
-	return artKey{hash, l.coverPx}, true
+	return artKey{hash, px}, true
 }
 
 func (m *Model) ensureArt() tea.Cmd {
@@ -313,6 +320,9 @@ func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "?":
 		m.help = !m.help
+		return m, nil
+	case "r":
+		m.showHistory = !m.showHistory
 		return m, nil
 	case "c":
 		if armed {

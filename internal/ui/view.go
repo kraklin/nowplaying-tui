@@ -23,7 +23,7 @@ const (
 	volTrackW = 10 // cells in the volume bar, after the icon and a space
 	iconGap   = "   "
 
-	helpText = "space play/pause · n/p skip · ←/→ seek · +/- volume · c clear · q quit"
+	helpText = "space play/pause · n/p skip · ←/→ seek · +/- vol · r history · c clear · q quit"
 )
 
 type layoutMode int
@@ -46,26 +46,42 @@ func marginX(w int) int { return minMarginX + max(0, w-80)/5 }
 
 func (m Model) layout() layout {
 	w, h := max(m.w-2*marginX(m.w), 0), max(m.h-2*marginY, 0)
-	hist := func(rows int) int { return max(0, min(rows, len(m.recent))) }
+	hist := func(rows int) int {
+		if !m.showHistory {
+			return 0
+		}
+		return max(0, min(rows, len(m.recent)))
+	}
 	text := func() layout {
 		return layout{mode: textOnly, infoW: min(max(w, 10), 60), histRows: hist(h - infoLines)}
 	}
-	if m.w < 40 || m.h < 12 {
+	if !m.cfg.ShowCover || m.w < 40 || m.h < 12 {
 		return text()
 	}
 	even := func(n int) int { return n &^ 1 }
-	if m.w >= 70 {
+	// Cells are about twice as tall as they are wide, so a pane is portrait when
+	// it is taller than wide in pixels: rows*2 > columns.
+	portrait := m.h*2 > m.w
+	if m.w >= 70 && !portrait {
 		px := even(min(h*2, m.cfg.ArtMaxPx, w*45/100, w-gap-minInfoW))
 		if px < 8 {
 			return text()
 		}
 		return layout{mode: sideBySide, coverPx: px, infoW: min(w-px-gap, maxInfoW), histRows: hist(h - infoLines)}
 	}
-	px := even(min((h-infoLines-1)*2, m.cfg.ArtMaxPx, w))
+	// Stacked: reserve a comfortable cover first, give history what is left, and
+	// let the cover grow into any space still unused.
+	want := even(min(m.cfg.ArtMaxPx, 24, w))
+	hr := hist(h - 1 - want/2 - infoLines)
+	infoH := infoLines - 2 // no history block
+	if hr > 0 {
+		infoH = infoLines + hr
+	}
+	px := even(min((h-1-infoH)*2, m.cfg.ArtMaxPx, w))
 	if px < 8 {
 		return text()
 	}
-	return layout{mode: stacked, coverPx: px, infoW: min(w, 60)}
+	return layout{mode: stacked, coverPx: px, infoW: min(w, 60), histRows: hr}
 }
 
 // geom says where the info block sits on screen, for mouse hit-testing.
@@ -91,9 +107,14 @@ func (m Model) compose() ([]string, geom) {
 	accent := "#c9a7ff"
 	var cover []string
 	if key, ok := m.wantArt(); ok {
-		if r, cached := m.cache[key]; cached {
-			cover, accent = strings.Split(r.Rendered, "\n"), r.Accent
-		} else {
+		r, cached := m.cache[key]
+		switch {
+		case cached:
+			accent = r.Accent
+			if l.coverPx > 0 {
+				cover = strings.Split(r.Rendered, "\n")
+			}
+		case l.coverPx > 0: // not rendered yet: keep the space
 			cover = make([]string, l.coverPx/2)
 			for i := range cover {
 				cover[i] = strings.Repeat(" ", l.coverPx)
@@ -357,6 +378,9 @@ func (m Model) historyRows(n, w int) []string {
 	bg, bright, soft := m.th.bg, m.th.bright, m.th.soft
 	for i, e := range m.recent[:n] {
 		f := fade(i)
+		if !m.cfg.HistoryFade {
+			f = 1
+		}
 		brightSt, softSt := fadedStyle(bright, bg, f), fadedStyle(soft, bg, f)
 		dur := fmtDur(int(e.Duration.Seconds()))
 		row := softSt.Render(sprintf("%-2d", i+1)) + " " +

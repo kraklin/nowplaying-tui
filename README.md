@@ -50,6 +50,7 @@ external tools, so it works on Linux too.
 | `p`, `h` | Previous track |
 | `←` / `→` | Seek −5 s / +5 s (quick presses chain) |
 | `+` / `-` | System volume +5 / −5 |
+| `r` | Show or hide the recently played list |
 | `c` | Clear the recently played list (press `c` again to confirm) |
 | `?` | Show or hide the key help line |
 | `q`, `ctrl+c` | Quit |
@@ -79,16 +80,27 @@ changes when the player reports the result.
 
 | Pane | What you get |
 | --- | --- |
-| 70+ columns | Cover on the left, info on the right, vertically centred |
-| under 70 columns | Cover stacked above the info, centred |
-| under 40 columns or 12 rows | Text only, no cover |
+| 70+ columns, landscape | Cover on the left, info on the right, vertically centred |
+| under 70 columns, or portrait | Cover stacked above the info, centred; the history fits underneath when there is room |
+| under 40 columns or 12 rows, or `show_cover = false` | Text only, no cover |
+
+A pane is *portrait* when it is taller than wide as you see it. Terminal cells are
+about twice as tall as they are wide, so that means rows × 2 > columns: 80×41
+stacks, 80×40 does not.
 
 The cover is the largest even number of pixels that fits (two pixels per cell
-vertically), capped by `art_max_px` and at about 45% of the width. Side margins
-grow with the pane so wide terminals keep breathing room. The info column is
-at least 36 and at most 64 cells wide. Long titles are cut with `…`, never wrapped.
+vertically), capped by `art_max_px` and, beside the text, at about 45% of the
+width. When stacked, the cover gets a comfortable size first (up to 24 px), the
+history gets whatever is left, and the cover grows into any space still unused.
+Side margins grow with the pane so wide terminals keep breathing room. The info
+column is at least 36 and at most 64 cells wide. Long titles are cut with `…`,
+never wrapped.
 
-![the stacked layout used in narrow panes](docs/stacked.svg)
+![the stacked layout used in narrow and portrait panes](docs/stacked.svg)
+
+With `show_cover = false` you get just the text:
+
+![the text-only layout](docs/text.svg)
 
 ## Configuration
 
@@ -96,12 +108,15 @@ nowplaying reads `$XDG_CONFIG_HOME/nowplaying/config.toml`, or
 `~/.config/nowplaying/config.toml`. Every key is optional; these are the defaults:
 
 ```toml
+show_cover       = true      # false hides the cover: text only
 art_max_px       = 32        # cover size cap in pixels (8-128)
 quantize_colors  = 12        # flat, stylised palette; 0 = off (0-64)
 scanlines        = true      # darken every other pixel row by ~12%
 accent           = ""        # "#c9a7ff" to override the colour picked from the cover
 icons            = "unicode" # "unicode", "basic" or "nerd"
-history_size     = 50        # entries kept (1-500)
+history_size     = 10        # entries kept and shown at most (1-500)
+show_history     = true      # false starts with the list hidden (r toggles it)
+history_fade     = true      # false draws every history row at full strength
 min_play_seconds = 10        # a track must play this long to enter the history
 background       = ""        # "#1e1e2e": your terminal's background (see below)
 ```
@@ -112,6 +127,15 @@ A bad config never stops nowplaying. Invalid values fall back to their default, 
 file that cannot be parsed is ignored, and a short warning appears on the first
 line for a few seconds.
 
+- **`show_cover`:** `false` shows only the text. The accent colour still follows the
+  artwork: nowplaying decodes a small copy of the cover just to pick it, and the pick
+  does not depend on the cover's size, so resizing the pane never shifts it.
+- **`history_size`:** this is both how many tracks are remembered and the most that
+  can be shown (fewer if the pane is short). The default is 10. If you used an earlier
+  version with a longer saved list, the next save trims it to this size.
+- **`show_history` / `history_fade`:** `show_history = false` starts with the list
+  hidden and `r` shows it. Hiding only changes the view: tracks are still recorded.
+  `history_fade = false` turns off the gradient that dims older rows.
 - **`icons`:** `unicode` uses `⏮ < ⏵/⏸ > ⏭`: back and forward are plain ASCII, the
   rest are single-cell symbols. If the pane border drifts or a glyph looks wrong
   in your terminal, use `basic` (`|◂ ◂◂ ▶/▮▮ ▸▸ ▸|`). `nerd` needs a Nerd Font.
@@ -203,7 +227,7 @@ The README screenshots are real frames from the app. To regenerate them:
 ```sh
 D=$(mktemp -d)
 NOWPLAYING_SNAPSHOT_DIR=$D go test -run TestWriteSnapshots ./internal/ui
-for n in wide stacked idle missing; do python3 scripts/ansi2svg.py $D/$n.ansi docs/$n.svg; done
+for n in wide stacked text idle missing; do python3 scripts/ansi2svg.py $D/$n.ansi docs/$n.svg; done
 ```
 
 Dependencies: Bubble Tea, Lip Gloss, `golang.org/x/image` (resizing),

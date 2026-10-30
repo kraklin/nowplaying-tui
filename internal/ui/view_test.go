@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/tomaslatall/nowplaying-tui/internal/art"
+	"github.com/tomaslatall/nowplaying-tui/internal/config"
 	"github.com/tomaslatall/nowplaying-tui/internal/history"
 	"github.com/tomaslatall/nowplaying-tui/internal/source"
 )
@@ -24,6 +25,12 @@ func settle(t *testing.T, w, h int, empty bool) Model {
 
 func settleBG(t *testing.T, w, h int, empty bool, bg color.RGBA) Model {
 	t.Helper()
+	return settleFull(t, w, h, empty, bg, nil)
+}
+
+// settleFull is settle with a background colour and a config, and renders the cover.
+func settleFull(t *testing.T, w, h int, empty bool, bg color.RGBA, cfg *config.Config) Model {
+	t.Helper()
 	ch := make(chan source.State, 1)
 	f := source.NewFake()
 	st := f.Snapshot()
@@ -31,7 +38,7 @@ func settleBG(t *testing.T, w, h int, empty bool, bg color.RGBA) Model {
 		st = source.State{}
 	}
 	ch <- st
-	var m tea.Model = New(ch, history.Demo(), bg, Deps{Volume: demoVolume{}})
+	var m tea.Model = New(ch, history.Demo(), bg, Deps{Volume: demoVolume{}, Config: cfg})
 	var cmds []tea.Cmd
 	for _, msg := range []tea.Msg{tea.WindowSizeMsg{Width: w, Height: h}, StateMsg(<-ch)} {
 		var c tea.Cmd
