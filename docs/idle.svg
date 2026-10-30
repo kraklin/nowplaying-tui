@@ -63,17 +63,6 @@
 <rect x="288" y="36" width="9" height="9" fill="#32323a"/>
 <rect x="288" y="45" width="9" height="9" fill="#33333b"/>
 <rect x="297" y="45" width="9" height="9" fill="#34343c"/>
-<text x="346.5" y="49.32" text-anchor="middle" fill="#9a9aa1">♫</text>
-<text x="373.5" y="49.32" text-anchor="middle" fill="#9a9aa1">n</text>
-<text x="382.5" y="49.32" text-anchor="middle" fill="#9a9aa1">o</text>
-<text x="391.5" y="49.32" text-anchor="middle" fill="#9a9aa1">w</text>
-<text x="409.5" y="49.32" text-anchor="middle" fill="#9a9aa1">p</text>
-<text x="418.5" y="49.32" text-anchor="middle" fill="#9a9aa1">l</text>
-<text x="427.5" y="49.32" text-anchor="middle" fill="#9a9aa1">a</text>
-<text x="436.5" y="49.32" text-anchor="middle" fill="#9a9aa1">y</text>
-<text x="445.5" y="49.32" text-anchor="middle" fill="#9a9aa1">i</text>
-<text x="454.5" y="49.32" text-anchor="middle" fill="#9a9aa1">n</text>
-<text x="463.5" y="49.32" text-anchor="middle" fill="#9a9aa1">g</text>
 <rect x="18" y="54" width="9" height="9" fill="#23232b"/>
 <rect x="18" y="63" width="9" height="9" fill="#23232b"/>
 <rect x="27" y="54" width="9" height="9" fill="#23232b"/>
@@ -202,20 +191,20 @@
 <rect x="288" y="81" width="9" height="9" fill="#35353d"/>
 <rect x="297" y="72" width="9" height="9" fill="#35353d"/>
 <rect x="297" y="81" width="9" height="9" fill="#36363e"/>
-<text x="346.5" y="85.32" text-anchor="middle" fill="#c9a7ff">n</text>
-<text x="355.5" y="85.32" text-anchor="middle" fill="#c9a7ff">o</text>
-<text x="364.5" y="85.32" text-anchor="middle" fill="#c9a7ff">t</text>
-<text x="373.5" y="85.32" text-anchor="middle" fill="#c9a7ff">h</text>
-<text x="382.5" y="85.32" text-anchor="middle" fill="#c9a7ff">i</text>
-<text x="391.5" y="85.32" text-anchor="middle" fill="#c9a7ff">n</text>
-<text x="400.5" y="85.32" text-anchor="middle" fill="#c9a7ff">g</text>
-<text x="418.5" y="85.32" text-anchor="middle" fill="#c9a7ff">p</text>
-<text x="427.5" y="85.32" text-anchor="middle" fill="#c9a7ff">l</text>
-<text x="436.5" y="85.32" text-anchor="middle" fill="#c9a7ff">a</text>
-<text x="445.5" y="85.32" text-anchor="middle" fill="#c9a7ff">y</text>
-<text x="454.5" y="85.32" text-anchor="middle" fill="#c9a7ff">i</text>
-<text x="463.5" y="85.32" text-anchor="middle" fill="#c9a7ff">n</text>
-<text x="472.5" y="85.32" text-anchor="middle" fill="#c9a7ff">g</text>
+<text x="445.5" y="85.32" text-anchor="middle" fill="#c9a7ff">n</text>
+<text x="454.5" y="85.32" text-anchor="middle" fill="#c9a7ff">o</text>
+<text x="463.5" y="85.32" text-anchor="middle" fill="#c9a7ff">t</text>
+<text x="472.5" y="85.32" text-anchor="middle" fill="#c9a7ff">h</text>
+<text x="481.5" y="85.32" text-anchor="middle" fill="#c9a7ff">i</text>
+<text x="490.5" y="85.32" text-anchor="middle" fill="#c9a7ff">n</text>
+<text x="499.5" y="85.32" text-anchor="middle" fill="#c9a7ff">g</text>
+<text x="517.5" y="85.32" text-anchor="middle" fill="#c9a7ff">p</text>
+<text x="526.5" y="85.32" text-anchor="middle" fill="#c9a7ff">l</text>
+<text x="535.5" y="85.32" text-anchor="middle" fill="#c9a7ff">a</text>
+<text x="544.5" y="85.32" text-anchor="middle" fill="#c9a7ff">y</text>
+<text x="553.5" y="85.32" text-anchor="middle" fill="#c9a7ff">i</text>
+<text x="562.5" y="85.32" text-anchor="middle" fill="#c9a7ff">n</text>
+<text x="571.5" y="85.32" text-anchor="middle" fill="#c9a7ff">g</text>
 <rect x="18" y="90" width="9" height="9" fill="#25252d"/>
 <rect x="18" y="99" width="9" height="9" fill="#25252d"/>
 <rect x="27" y="90" width="9" height="9" fill="#25252d"/>
@@ -570,11 +559,11 @@
 <rect x="288" y="171" width="9" height="9" fill="#3b3b43"/>
 <rect x="297" y="162" width="9" height="9" fill="#3b3b43"/>
 <rect x="297" y="171" width="9" height="9" fill="#3b3b43"/>
-<text x="346.5" y="175.32" text-anchor="middle" fill="#cdd6f4">⏮</text>
-<text x="382.5" y="175.32" text-anchor="middle" fill="#cdd6f4">&lt;</text>
-<text x="418.5" y="175.32" text-anchor="middle" fill="#c9a7ff">⏵</text>
-<text x="454.5" y="175.32" text-anchor="middle" fill="#cdd6f4">&gt;</text>
-<text x="490.5" y="175.32" text-anchor="middle" fill="#cdd6f4">⏭</text>
+<text x="409.5" y="175.32" text-anchor="middle" fill="#cdd6f4">⏮</text>
+<text x="445.5" y="175.32" text-anchor="middle" fill="#cdd6f4">&lt;</text>
+<text x="481.5" y="175.32" text-anchor="middle" fill="#c9a7ff">⏵</text>
+<text x="517.5" y="175.32" text-anchor="middle" fill="#cdd6f4">&gt;</text>
+<text x="553.5" y="175.32" text-anchor="middle" fill="#cdd6f4">⏭</text>
 <text x="580.5" y="175.32" text-anchor="middle" fill="#cdd6f4">♪</text>
 <text x="598.5" y="175.32" text-anchor="middle" fill="#c9a7ff">━</text>
 <text x="607.5" y="175.32" text-anchor="middle" fill="#c9a7ff">━</text>

@@ -430,13 +430,13 @@ func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	_, hits, vol := m.transportRow(accentStyle("#000000"), g.infoW)
 	switch msg.Button {
 	case tea.MouseButtonLeft:
-		switch row {
-		case rowProgress:
+		switch {
+		case row == g.progRow && g.progRow >= 0:
 			if bw := m.barWidth(g.infoW); bw > 1 && col < bw && !m.state.Empty() {
 				frac := float64(col) / float64(bw-1)
 				return m.seekTarget(time.Duration(frac * float64(m.state.Duration)))
 			}
-		case rowTransport:
+		case row == g.ctrlRow:
 			for _, h := range hits {
 				if col < h.x0 || col >= h.x1 {
 					continue
@@ -456,7 +456,7 @@ func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case tea.MouseButtonWheelUp, tea.MouseButtonWheelDown:
-		if row == rowTransport && vol[0] >= 0 && col >= vol[0] && col < vol[1] {
+		if row == g.ctrlRow && vol[0] >= 0 && col >= vol[0] && col < vol[1] {
 			if msg.Button == tea.MouseButtonWheelUp {
 				return m.changeVolume(volStep)
 			}

@@ -20,6 +20,10 @@ const (
 	rowProgress  = 5
 	rowTransport = 7
 
+	// Below this the card drops to its compact form: title, artist, controls + time.
+	compactBelowRows = 10
+	compactBelowCols = 30
+
 	volTrackW = 10 // cells in the volume bar, after the icon and a space
 	iconGap   = "   "
 
@@ -35,6 +39,7 @@ const (
 )
 
 type layout struct {
+	compact  bool // title, artist and controls + time only
 	mode     layoutMode
 	coverPx  int // 0 hides the cover
 	infoW    int
@@ -45,6 +50,9 @@ type layout struct {
 func marginX(w int) int { return minMarginX + max(0, w-80)/5 }
 
 func (m Model) layout() layout {
+	if m.h < compactBelowRows || m.w < compactBelowCols {
+		return layout{mode: textOnly, compact: true, infoW: min(max(m.w-2, 1), 60)}
+	}
 	w, h := max(m.w-2*marginX(m.w), 0), max(m.h-2*marginY, 0)
 	hist := func(rows int) int {
 		if !m.showHistory {
@@ -93,6 +101,9 @@ func (m Model) layout() layout {
 // geom says where the info block sits on screen, for mouse hit-testing.
 type geom struct {
 	infoX, infoY, infoW int
+	// Rows inside the info block holding the progress bar and the controls, for
+	// mouse hit-testing; progRow is -1 when there is no bar (compact card).
+	progRow, ctrlRow int
 }
 
 func (m Model) View() string {
@@ -165,7 +176,11 @@ func (m Model) compose() ([]string, geom) {
 		text := fit(helpText, min(m.w-2, lipgloss.Width(helpText)))
 		rows[m.h-1] = paint([]segment{{max((m.w-lipgloss.Width(text))/2, 0), m.th.dim2.Render(strings.TrimRight(text, " "))}})
 	}
-	return rows, geom{infoX: infoX, infoY: infoY, infoW: l.infoW}
+	g := geom{infoX: infoX, infoY: infoY, infoW: l.infoW, progRow: rowProgress, ctrlRow: rowTransport}
+	if l.compact {
+		g.progRow, g.ctrlRow = -1, len(info)-1
+	}
+	return rows, g
 }
 
 type segment struct {
@@ -223,39 +238,32 @@ func (m Model) missingView() string {
 }
 
 func (m Model) info(l layout, accentHex string) string {
+	if l.compact {
+		return m.compactInfo(l, accentStyle(accentHex))
+	}
 	w := l.infoW
 	ac := accentStyle(accentHex)
 	s := m.state
 	line := func(x string) string { return lipgloss.NewStyle().Width(w).Render(x) }
-	// Text is centred unless it sits beside the cover: stacked cards centre it under
-	// the cover, and a card without a cover is a centred column of text.
-	align := func(x string) string {
-		if l.mode != sideBySide {
-			return centerIn(x, w)
-		}
-		return x
-	}
+	// Text is always centred; the bar and the history keep the full width.
+	align := func(x string) string { return centerIn(x, w) }
 
-	// A note (error, confirmation) takes over the label row; it must stay one row.
-	// The label must stay on one row (the mouse rows depend on it): drop the app tag
-	// when it does not fit, and cut the label itself in a very narrow card.
-	const labelText = "♫  now playing"
-	labelRow := m.th.dim.Render(labelText)
+	// First row: the name of the source (Spotify, Firefox…), or nothing. A note
+	// (error, confirmation) takes its place. It must stay one row: the mouse rows
+	// depend on it.
 	tag := appName(s.App)
 	if s.Status == source.StatusReconnecting {
 		tag = "reconnecting…"
 	} else if s.Empty() {
 		tag = ""
 	}
-	switch {
-	case lipgloss.Width(labelText) > w:
-		labelRow = m.th.dim.Render(strings.TrimRight(fit(labelText, w), " "))
-	case tag != "" && lipgloss.Width(labelText)+2+lipgloss.Width(tag) <= w:
-		labelRow += "  " + m.th.dim2.Render(tag)
+	labelRow := ""
+	if tag != "" {
+		labelRow = m.th.dim.Render(strings.TrimRight(fit(tag, w), " "))
 	}
 	if m.note != "" {
 		tail := m.noteTail
-		head := strings.TrimRight(fit("♫  "+m.note, max(w-lipgloss.Width(tail), 1)), " ")
+		head := strings.TrimRight(fit(m.note, max(w-lipgloss.Width(tail), 1)), " ")
 		labelRow = m.th.dim.Render(head + tail)
 	}
 	title, sub := "nothing playing", ""
@@ -272,7 +280,7 @@ func (m Model) info(l layout, accentHex string) string {
 	transport, _, _ := m.transportRow(ac, w)
 
 	lines := []string{
-		align(labelRow), "",
+		line(align(labelRow)), "",
 		line(align(ac.Render(strings.TrimRight(fit(title, w), " ")))),
 		line(align(m.truncStyled(sub, s.Artist+" · "+s.Album, w))), "",
 		line(progress), "",
@@ -366,40 +374,109 @@ type hit struct {
 // transportRow renders the icons and volume bar and reports where they are, so
 // clicks and scrolls land on exactly what was drawn. volX is -1 when the volume
 // bar is not shown.
-func (m Model) transportRow(ac lipgloss.Style, w int) (row string, hits []hit, vol [2]int) {
+// iconRow lays out the given buttons left to right and returns where each can be
+// clicked (one cell of slack either side; the 3-cell gaps keep spans apart).
+func (m Model) iconRow(ac lipgloss.Style, acts []action) (left string, hits []hit, width int) {
 	ic := m.icons
 	playIcon := ic.pause
 	if !m.state.Playing {
 		playIcon = ic.play
 	}
-	items := []struct {
-		styled, plain string
-		act           action
-	}{
-		{ic.prev, ic.prev, actPrev},
-		{ic.back, ic.back, actBack},
-		{ac.Render(playIcon), playIcon, actPlay},
-		{ic.fwd, ic.fwd, actFwd},
-		{ic.next, ic.next, actNext},
+	all := map[action][2]string{
+		actPrev: {ic.prev, ic.prev}, actBack: {ic.back, ic.back}, actPlay: {ac.Render(playIcon), playIcon},
+		actFwd: {ic.fwd, ic.fwd}, actNext: {ic.next, ic.next},
 	}
-	parts := make([]string, len(items))
+	parts := make([]string, len(acts))
 	x := 0
-	for i, it := range items {
-		parts[i] = it.styled
-		width := lipgloss.Width(it.plain)
-		// one cell of slack either side; the 3-cell gaps keep spans apart
-		hits = append(hits, hit{x - 1, x + width + 1, it.act})
-		x += width + len(iconGap)
+	for i, a := range acts {
+		parts[i] = all[a][0]
+		w := lipgloss.Width(all[a][1])
+		hits = append(hits, hit{x - 1, x + w + 1, a})
+		x += w + len(iconGap)
 	}
-	left := strings.Join(parts, iconGap)
+	left = strings.Join(parts, iconGap)
+	return left, hits, lipgloss.Width(left)
+}
+
+// elapsedSeconds is the interpolated position in whole seconds.
+func (m Model) elapsedSeconds() int {
+	if m.state.Empty() {
+		return 0
+	}
+	return int(m.state.Position(m.now).Seconds())
+}
+
+// compactControls is the controls row of the compact card: the buttons followed
+// by the time, centred. In a very narrow card it drops the time, then the outer
+// buttons, down to play/pause alone. There is no volume bar.
+func (m Model) compactControls(ac lipgloss.Style, w int) (string, []hit, [2]int) {
+	var left string
+	var hits []hit
+	var lw int
+	for _, set := range [][]action{{actPrev, actBack, actPlay, actFwd, actNext}, {actPrev, actPlay, actNext}, {actPlay}} {
+		if left, hits, lw = m.iconRow(ac, set); lw <= w {
+			break
+		}
+	}
+	timeText := timeLabel(m.elapsedSeconds(), int(m.state.Duration.Seconds()))
+	if !m.state.Empty() && m.state.Duration <= 0 {
+		timeText = fmtDur(m.elapsedSeconds())
+	}
+	group, tail := lw, ""
+	if lw+2+lipgloss.Width(timeText) <= w {
+		tail = "  " + m.th.dim.Render(timeText)
+		group += 2 + lipgloss.Width(timeText)
+	}
+	lead := max((w-group)/2, 0)
+	for i := range hits {
+		hits[i].x0 += lead
+		hits[i].x1 += lead
+	}
+	return strings.Repeat(" ", lead) + left + tail, hits, [2]int{-1, -1}
+}
+
+// compactInfo is the card for very small panes: title, artist, then controls and
+// time. With fewer rows the artist joins the title, then only the controls remain.
+func (m Model) compactInfo(l layout, ac lipgloss.Style) string {
+	w, s := l.infoW, m.state
+	line := func(x string) string { return lipgloss.NewStyle().Width(w).Render(x) }
+	title, artist, album := "nothing playing", "", ""
+	if !s.Empty() {
+		title, artist, album = s.Title, s.Artist, s.Album
+	}
+	titleRow := centerIn(ac.Render(strings.TrimRight(fit(title, w), " ")), w)
+	subRow := ""
+	if !s.Empty() {
+		subRow = centerIn(m.truncStyled(lipgloss.NewStyle().Bold(true).Render(artist)+m.th.dim.Render(" · "+album), artist+" · "+album, w), w)
+	}
+	if m.note != "" {
+		subRow = centerIn(m.th.dim.Render(strings.TrimRight(fit(m.note, w), " ")), w)
+	}
+	controls, _, _ := m.compactControls(ac, w)
+	switch {
+	case m.h >= 3:
+		return strings.Join([]string{line(titleRow), line(subRow), line(controls)}, "\n")
+	case m.h == 2:
+		one := titleRow
+		if artist != "" {
+			joined := title + " · " + artist
+			one = centerIn(ac.Render(strings.TrimRight(fit(joined, w), " ")), w)
+		}
+		return strings.Join([]string{line(one), line(controls)}, "\n")
+	}
+	return line(controls)
+}
+
+func (m Model) transportRow(ac lipgloss.Style, w int) (row string, hits []hit, vol [2]int) {
+	if m.layout().compact {
+		return m.compactControls(ac, w)
+	}
+	ic := m.icons
+	left, hits, _ := m.iconRow(ac, []action{actPrev, actBack, actPlay, actFwd, actNext})
 	lw := lipgloss.Width(left)
 
-	// Cards that are not side by side centre the icons; the volume bar stays at the
-	// right edge.
-	lead := 0
-	if m.layout().mode != sideBySide {
-		lead = max((w-lw)/2, 0)
-	}
+	// The icons are centred; the volume bar stays at the right edge.
+	lead := max((w-lw)/2, 0)
 
 	// While muted the word "mute" replaces the bar, padded to the same width so
 	// nothing in the row moves and the scroll region stays where it was.

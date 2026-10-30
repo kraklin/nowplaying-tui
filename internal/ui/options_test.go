@@ -65,7 +65,7 @@ func TestShowCoverFalseShowsOnlyText(t *testing.T) {
 	if strings.ContainsAny(v, "▀▄") {
 		t.Errorf("no cover cells should be drawn")
 	}
-	for _, want := range []string{"now playing", "Low Orbit", "Neon Ferns", "/ 3:58", "recently played", "Paper Sa"} {
+	for _, want := range []string{"Spotify", "Low Orbit", "Neon Ferns", "/ 3:58", "recently played", "Paper Sa"} {
 		if !strings.Contains(stripANSI(v), want) {
 			t.Errorf("text-only card is missing %q:\n%s", want, stripANSI(v))
 		}
@@ -115,8 +115,8 @@ func TestAccentStillFollowsTheCoverInATinyPane(t *testing.T) {
 func TestCoverOffStillShowsAPlaceholderFreeIdleCard(t *testing.T) {
 	m := settleFull(t, 100, 30, true, art.DarkBG, cfgWith(func(c *config.Config) { c.ShowCover = false }))
 	v := stripANSI(m.View())
-	if strings.ContainsAny(v, "▀▄") || strings.Count(v, "♫") != 1 {
-		t.Errorf("the idle card should have no placeholder cover either (only the label's ♫):\n%s", v)
+	if strings.ContainsAny(v, "▀▄") || strings.Contains(v, "♫") {
+		t.Errorf("the idle card should have no placeholder cover (and so no ♫):\n%s", v)
 	}
 	if !strings.Contains(v, "nothing playing") {
 		t.Errorf("idle text missing")
@@ -202,7 +202,7 @@ func TestPortraitStackIsActuallyDrawnStacked(t *testing.T) {
 			if strings.ContainsAny(r, "▀▄") {
 				lastCover = i
 			}
-			if label < 0 && strings.Contains(r, "now playing") {
+			if label < 0 && strings.Contains(r, "Spotify") {
 				label = i
 			}
 		}
@@ -392,7 +392,7 @@ func TestHidingHistoryRecentresTheInfoColumnAgainstTheCover(t *testing.T) {
 			}
 			coverBottom = i
 		}
-		if label < 0 && strings.Contains(r, "now playing") {
+		if label < 0 && strings.Contains(r, "Spotify") {
 			label = i
 		}
 	}
@@ -536,7 +536,7 @@ func TestCoverKeyHidesAndShowsTheCover(t *testing.T) {
 	if hasCover(hidden) || hidden.layout().mode != textOnly {
 		t.Errorf("a should hide the cover and give the text-only card (mode %v)", hidden.layout().mode)
 	}
-	for _, want := range []string{"Low Orbit", "now playing", "recently played"} {
+	for _, want := range []string{"Low Orbit", "Spotify", "recently played"} {
 		if !strings.Contains(stripANSI(hidden.View()), want) {
 			t.Errorf("hiding the cover must keep %q", want)
 		}

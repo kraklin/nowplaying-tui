@@ -192,12 +192,14 @@ func TestClicksElsewhereDoNothing(t *testing.T) {
 	h := newHarness(playing(0, 200*time.Second), Deps{Control: rec.control, Volume: &fakeVol{}})
 	h.send(VolumeMsg{Level: 50})
 	_, g := h.m.compose()
+	_, hitsRow, _ := h.m.transportRow(accentStyle("#000000"), g.infoW)
+	lastHitEnd := hitsRow[len(hitsRow)-1].x1
 	px, py := h.find(h.m.icons.prev)
 	for name, pos := range map[string][2]int{
 		"title":              {g.infoX + 2, g.infoY + 2},
 		"artist":             {g.infoX + 2, g.infoY + 3},
 		"label":              {g.infoX + 2, g.infoY},
-		"past the last icon": {g.infoX + 22, py},
+		"past the last icon": {g.infoX + lastHitEnd + 1, py},
 		"between icons":      {px + 2, py},
 		"cover":              {2, g.infoY + 3},
 		"left of the pane":   {0, 0},
@@ -385,7 +387,7 @@ func TestHelpDoesNotCoverTheCardInShortPanes(t *testing.T) {
 	h := newHarness(playing(0, 200*time.Second), Deps{})
 	h.resize(80, 10)
 	h.press("?")
-	if !strings.Contains(h.m.View(), "now playing") || !strings.Contains(h.m.View(), "Low Orbit") {
+	if !strings.Contains(h.m.View(), "Spotify") || !strings.Contains(h.m.View(), "Low Orbit") {
 		t.Errorf("the card must stay visible:\n%s", h.m.View())
 	}
 }
@@ -413,7 +415,7 @@ func TestMissingMediaControlShowsInstallHint(t *testing.T) {
 				t.Errorf("%v: row %d is %d wide", sz, i, lipgloss.Width(r))
 			}
 		}
-		if strings.Contains(v, "now playing") || strings.Contains(v, "▀") {
+		if strings.Contains(v, "Spotify") || strings.Contains(v, "▀") {
 			t.Errorf("%v: the card should not show when media-control is missing", sz)
 		}
 	}
@@ -464,7 +466,7 @@ func TestReconnectingIsShownWithoutWrapping(t *testing.T) {
 		if !strings.Contains(v, "Low Orbit") {
 			t.Errorf("w=%d: the last track stays visible", w)
 		}
-		if strings.Count(v, "♫") != 1 {
+		if strings.Count(v, "reconnecting…") != 1 {
 			t.Errorf("w=%d: label row wrapped:\n%s", w, v)
 		}
 	}
@@ -588,7 +590,7 @@ func TestConfigWarningsAreShownThenFade(t *testing.T) {
 	if !strings.Contains(v, "config: icons must be") || !strings.Contains(v, "+2 more") {
 		t.Errorf("the first warning and a count should show:\n%s", v)
 	}
-	if strings.Count(v, "♫") != 1 {
+	if strings.Count(v, "config: icons must be") != 1 {
 		t.Errorf("the warning must not wrap the label row:\n%s", v)
 	}
 	h.send(TickMsg(time.Now().Add(warnFor + time.Second))) // New stamps the note with the real clock
@@ -632,7 +634,7 @@ func TestStackedLayoutRules(t *testing.T) {
 			if strings.ContainsAny(r, "▀▄") {
 				lastCover = i
 			}
-			if label < 0 && strings.Contains(r, "now playing") {
+			if label < 0 && strings.Contains(r, "Spotify") {
 				label = i
 			}
 		}
@@ -648,7 +650,8 @@ func TestStackedLayoutRules(t *testing.T) {
 		}
 		// cover and info are centred on the same axis
 		cx := cellX(rows[lastCover], "▀")
-		ix := cellX(rows[label], "♫")
+		_, gg := m.compose()
+		ix := gg.infoX
 		coverW := m.layout().coverPx
 		if mid := cx + coverW/2; mid < ix || mid > ix+m.layout().infoW {
 			t.Errorf("%v: cover (centre %d) and info column (%d..%d) should line up", sz, mid, ix, ix+m.layout().infoW)
@@ -672,7 +675,7 @@ func TestSideBySideLayoutRules(t *testing.T) {
 				}
 				lastCover = i
 			}
-			if label < 0 && strings.Contains(r, "now playing") {
+			if label < 0 && strings.Contains(r, "Spotify") {
 				label = i
 			}
 		}
@@ -690,7 +693,8 @@ func TestSideBySideLayoutRules(t *testing.T) {
 		if cx < 0 || coverEnd-cx != l.coverPx {
 			t.Errorf("%v: cover is %d cells wide, want %d", sz, coverEnd-cx, l.coverPx)
 		}
-		if lx := cellX(rows[label], "♫"); lx-coverEnd != gap {
+		_, gg := m.compose()
+		if lx := gg.infoX; lx-coverEnd != gap {
 			t.Errorf("%v: %d cells between cover and info, want %d", sz, lx-coverEnd, gap)
 		}
 	}

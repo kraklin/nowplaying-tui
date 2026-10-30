@@ -85,6 +85,7 @@ changes when the player reports the result.
 | 70+ columns, landscape | Cover on the left, info on the right, vertically centred |
 | under 70 columns, or portrait | Cover stacked above the info, centred; the history fits underneath when there is room |
 | under 40 columns or 12 rows, or `show_cover = false` | Text only, no cover |
+| under 30 columns or 10 rows | The compact card (below) |
 
 A pane is *portrait* when it is taller than wide as you see it. Terminal cells are
 about twice as tall as they are wide, so that means rows × 2 > columns: 80×41
@@ -98,11 +99,24 @@ Side margins grow with the pane so wide terminals keep breathing room. The info
 column is at least 36 and at most 64 cells wide. Long titles are cut with `…`,
 never wrapped.
 
-Whenever the text is not beside the cover (stacked, or no cover), the label, title,
-artist line and control icons are centred; the progress bar and the history list
-keep the full width. Beside the cover the text stays left-aligned. The volume bar
-stays at the right edge of the controls row, and in a narrow card the icons move
-left just far enough to keep two cells clear of it.
+The first row is the name of the source (Spotify, Firefox, …), and it is blank
+when nothing is playing. The source name, title, artist line and control icons
+are always centred; the progress bar and the history list keep the full width. The
+volume bar stays at the right edge of the controls row, and in a narrow card the
+icons move left just far enough to keep two cells clear of it.
+
+### Compact card
+
+In a really small pane (under 10 rows or under 30 columns) everything that is not
+essential goes: no cover, no source row, no progress bar, no volume, no history. What
+is left is the title, the artist and one row with the controls and the time:
+
+![the compact card for very small panes](docs/compact.svg)
+
+With fewer rows it shrinks further: two rows give `title · artist` and the controls;
+one row gives just the controls and the time. In a very narrow card the time goes
+first, then the back and forward buttons, then previous and next, so play/pause is
+always there. The buttons are still clickable; there is no bar to click.
 
 ![the stacked layout used in narrow and portrait panes](docs/stacked.svg)
 
@@ -236,7 +250,7 @@ The README screenshots are real frames from the app. To regenerate them:
 ```sh
 D=$(mktemp -d)
 NOWPLAYING_SNAPSHOT_DIR=$D go test -run TestWriteSnapshots ./internal/ui
-for n in wide stacked text idle missing; do python3 scripts/ansi2svg.py $D/$n.ansi docs/$n.svg; done
+for n in wide stacked text compact idle missing; do python3 scripts/ansi2svg.py $D/$n.ansi docs/$n.svg; done
 ```
 
 Dependencies: Bubble Tea, Lip Gloss, `golang.org/x/image` (resizing),

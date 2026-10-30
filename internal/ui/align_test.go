@@ -66,10 +66,10 @@ func TestStackedLabelTitleAndArtistAreCentred(t *testing.T) {
 	}
 }
 
-// Centring needs room: the icons (19 cells) plus, on each side, the volume bar
+// Centring needs room: the icons (17 cells) plus, on each side, the volume bar
 // (12) and a 2-cell gap. Narrower cards shift the icons left just enough to clear
 // the volume bar (see TestStackedIconsNeverCrowdTheVolumeBar).
-const centringNeedsAtLeast = 19 + 2*(12+2)
+const centringNeedsAtLeast = 17 + 2*(12+2)
 
 func TestStackedControlsAreCentred(t *testing.T) {
 	checked := 0
@@ -130,20 +130,26 @@ func TestStackedIconsNeverCrowdTheVolumeBar(t *testing.T) {
 	}
 }
 
-// Left alignment is only for text that sits beside the cover.
-func TestSideBySideStaysLeftAligned(t *testing.T) {
-	h := newHarness(playing(0, 200*time.Second), Deps{}).withDemoHistory()
-	h.resize(80, 20)
-	if h.m.layout().mode != sideBySide {
-		t.Fatal("setup should be side by side")
-	}
-	_, g := h.m.compose()
-	rows := h.rows()
-	if x := cellX(rows[g.infoY+2], "Low Orbit"); x != g.infoX {
-		t.Errorf("the title starts at %d, want the left edge %d", x, g.infoX)
-	}
-	if x := cellX(rows[g.infoY+rowTransport], h.m.icons.prev); x != g.infoX {
-		t.Errorf("icons start at %d, want the left edge %d", x, g.infoX)
+// Text is centred in every layout, beside the cover included.
+func TestSideBySideTextIsCentredInItsColumn(t *testing.T) {
+	for _, sz := range [][2]int{{80, 20}, {100, 30}, {120, 30}, {200, 50}} {
+		h, g := stackedHarness(playing(0, 200*time.Second), sz[0], sz[1], Deps{Volume: &fakeVol{}})
+		if h.m.layout().mode != sideBySide {
+			t.Fatalf("%v should be side by side", sz)
+		}
+		for name, row := range map[string]int{"source": 0, "title": 2, "artist and album": 3} {
+			if l, r := margins(t, h, g, row); !near(l, r) || l == 0 {
+				t.Errorf("%v: %s has %d empty cells left and %d right", sz, name, l, r)
+			}
+		}
+		if g.infoW >= centringNeedsAtLeast {
+			ic := h.m.icons
+			row := h.rows()[g.infoY+rowTransport]
+			first, last := cellX(row, ic.prev), cellX(row, ic.next)+lipgloss.Width(ic.next)
+			if mid, want := (first+last)/2, g.infoX+g.infoW/2; !near(mid, want) {
+				t.Errorf("%v: icons centred on %d, column centre %d", sz, mid, want)
+			}
+		}
 	}
 }
 
@@ -306,7 +312,7 @@ func TestStackedNoteAndReconnectingAreCentredToo(t *testing.T) {
 
 func TestStackedNothingPlayingIsCentred(t *testing.T) {
 	h, g := stackedHarness(source.State{}, 80, 50, Deps{})
-	for name, row := range map[string]int{"label": 0, "title": 2} {
+	for name, row := range map[string]int{"title": 2} { // idle has no source, so the first row is blank
 		if l, r := margins(t, h, g, row); !near(l, r) || l == 0 {
 			t.Errorf("idle %s: %d / %d", name, l, r)
 		}
@@ -362,42 +368,13 @@ func TestScrollOverVolumeInStackedLayout(t *testing.T) {
 	}
 }
 
-func TestResizingAcrossTheStackingBoundaryMovesTheAlignment(t *testing.T) {
+func TestResizingAcrossTheStackingBoundaryKeepsTheTextCentred(t *testing.T) {
 	h := newHarness(playing(0, 200*time.Second), Deps{}).withDemoHistory()
-	h.resize(80, 20) // landscape: side by side, left aligned
-	_, g := h.m.compose()
-	if x := cellX(h.rows()[g.infoY+2], "Low Orbit"); x != g.infoX {
-		t.Fatalf("side by side starts at the left edge: %d vs %d", x, g.infoX)
-	}
-	h.resize(80, 50) // portrait: stacked, centred
-	_, g = h.m.compose()
-	if l, r := margins(t, h, g, 2); !near(l, r) || l == 0 {
-		t.Errorf("after resizing to portrait the title should be centred: %d / %d", l, r)
-	}
-	h.resize(80, 20)
-	_, g = h.m.compose()
-	if x := cellX(h.rows()[g.infoY+2], "Low Orbit"); x != g.infoX {
-		t.Errorf("and back to left aligned: %d vs %d", x, g.infoX)
-	}
-}
-
-// A label wider than the card used to wrap onto a second row, shifting every row
-// below it (and with them the mouse hit rows).
-func TestLabelNeverWrapsInNarrowCards(t *testing.T) {
-	for _, cover := range []bool{true, false} {
-		for w := 22; w <= 60; w++ {
-			cfg := cfgWith(func(c *config.Config) { c.ShowCover = cover })
-			h := newHarness(playing(0, 200*time.Second), Deps{Config: cfg}).withDemoHistory()
-			h.resize(w, 24)
-			_, g := h.m.compose()
-			rows := h.rows()
-			if g.infoY+2 >= len(rows) || !strings.Contains(rows[g.infoY+2], "Low Orbit") {
-				t.Errorf("w=%d cover=%v: the title is not on info row 2; the label probably wrapped:\n%s", w, cover, strings.Join(rows, "\n"))
-				continue
-			}
-			if n := strings.Count(strings.Join(rows, "\n"), "♫"); n != 1 {
-				t.Errorf("w=%d cover=%v: the label appears %d times", w, cover, n)
-			}
+	for _, sz := range [][2]int{{80, 20}, {80, 50}, {80, 20}, {60, 30}} {
+		h.resize(sz[0], sz[1])
+		_, g := h.m.compose()
+		if l, r := margins(t, h, g, 2); !near(l, r) || l == 0 {
+			t.Errorf("%v: the title should be centred: %d / %d", sz, l, r)
 		}
 	}
 }

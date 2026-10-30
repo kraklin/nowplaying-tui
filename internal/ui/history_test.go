@@ -245,7 +245,7 @@ func TestSavesCarryIncreasingSequence(t *testing.T) {
 // shifts down a line.
 func TestNotesNeverWrapTheLabelRow(t *testing.T) {
 	for _, w := range []int{50, 60, 70, 80, 100} {
-		for _, note := range []string{"history not saved", "play/pause failed", confirmNote, strings.Repeat("x", 80)} {
+		for _, note := range []string{"history not saved", "play/pause failed", confirmNote, "Zulu " + strings.Repeat("x", 80)} {
 			h := newHarness(track("First"), Deps{})
 			h.send(tea.WindowSizeMsg{Width: w, Height: 24})
 			before := strings.Count(h.m.View(), "\n")
@@ -254,12 +254,9 @@ func TestNotesNeverWrapTheLabelRow(t *testing.T) {
 			if strings.Count(after, "\n") != before {
 				t.Errorf("w=%d note %q changed the card height", w, note)
 			}
-			if n := strings.Count(after, "♫"); n != 1 {
-				t.Errorf("w=%d note %q: label row appears %d times, want 1:\n%s", w, note, n, after)
-			}
-			start := "♫  " + note[:min(6, len(note))]
-			if strings.Count(after, start) != 1 {
-				t.Errorf("w=%d note %q should sit on the label row:\n%s", w, note, after)
+			start := note[:min(6, len(note))]
+			if n := strings.Count(after, start); n != 1 {
+				t.Errorf("w=%d note %q: its text appears %d times, want once on a single row:\n%s", w, note, n, after)
 			}
 		}
 	}
