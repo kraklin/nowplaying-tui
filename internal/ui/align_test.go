@@ -8,8 +8,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/tomaslatall/nowplaying-tui/internal/config"
-	"github.com/tomaslatall/nowplaying-tui/internal/source"
+	"github.com/kraklin/nowplaying-tui/internal/config"
+	"github.com/kraklin/nowplaying-tui/internal/source"
 )
 
 // span is the first and one-past-last screen column holding non-space text.

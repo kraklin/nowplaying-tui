@@ -9,8 +9,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
-	"github.com/tomaslatall/nowplaying-tui/internal/config"
-	"github.com/tomaslatall/nowplaying-tui/internal/source"
+	"github.com/kraklin/nowplaying-tui/internal/config"
+	"github.com/kraklin/nowplaying-tui/internal/source"
 )
 
 // Not a real test: with NOWPLAYING_SNAPSHOT_DIR set it writes true-colour frames

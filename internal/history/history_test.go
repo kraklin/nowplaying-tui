@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tomaslatall/nowplaying-tui/internal/source"
+	"github.com/kraklin/nowplaying-tui/internal/source"
 )
 
 var t0 = time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)

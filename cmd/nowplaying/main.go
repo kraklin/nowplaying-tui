@@ -15,11 +15,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/muesli/termenv"
 
-	"github.com/tomaslatall/nowplaying-tui/internal/config"
-	"github.com/tomaslatall/nowplaying-tui/internal/history"
-	"github.com/tomaslatall/nowplaying-tui/internal/source"
-	"github.com/tomaslatall/nowplaying-tui/internal/ui"
-	"github.com/tomaslatall/nowplaying-tui/internal/volume"
+	"github.com/kraklin/nowplaying-tui/internal/config"
+	"github.com/kraklin/nowplaying-tui/internal/history"
+	"github.com/kraklin/nowplaying-tui/internal/source"
+	"github.com/kraklin/nowplaying-tui/internal/ui"
+	"github.com/kraklin/nowplaying-tui/internal/volume"
 )
 
 // version is set at build time with -ldflags "-X main.version=v1.2.3". Without

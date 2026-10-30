@@ -5,7 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/tomaslatall/nowplaying-tui/internal/source"
+	"github.com/kraklin/nowplaying-tui/internal/source"
 )
 
 // sourceTag is the name of the player for the bottom right corner: Spotify,

@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/tomaslatall/nowplaying-tui/internal/art"
+	"github.com/kraklin/nowplaying-tui/internal/art"
 )
 
 // theme holds every colour that depends on the terminal background, derived

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tomaslatall/nowplaying-tui/internal/config"
+	"github.com/kraklin/nowplaying-tui/internal/config"
 )
 
 func TestBackgroundPrecedence(t *testing.T) {

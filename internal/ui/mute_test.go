@@ -11,7 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/tomaslatall/nowplaying-tui/internal/source"
+	"github.com/kraklin/nowplaying-tui/internal/source"
 )
 
 // muteVol is a volume backend that can mute and records every call, in order.

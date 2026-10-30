@@ -3,7 +3,7 @@ package history
 import (
 	"time"
 
-	"github.com/tomaslatall/nowplaying-tui/internal/source"
+	"github.com/kraklin/nowplaying-tui/internal/source"
 )
 
 // DefaultMinPlay is how long a track must have played to enter the history.

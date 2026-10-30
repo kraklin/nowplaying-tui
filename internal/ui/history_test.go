@@ -9,9 +9,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/tomaslatall/nowplaying-tui/internal/config"
-	"github.com/tomaslatall/nowplaying-tui/internal/history"
-	"github.com/tomaslatall/nowplaying-tui/internal/source"
+	"github.com/kraklin/nowplaying-tui/internal/config"
+	"github.com/kraklin/nowplaying-tui/internal/history"
+	"github.com/kraklin/nowplaying-tui/internal/source"
 )
 
 func track(title string) source.State {

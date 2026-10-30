@@ -10,8 +10,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
-	"github.com/tomaslatall/nowplaying-tui/internal/config"
-	"github.com/tomaslatall/nowplaying-tui/internal/source"
+	"github.com/kraklin/nowplaying-tui/internal/config"
+	"github.com/kraklin/nowplaying-tui/internal/source"
 )
 
 func (h *harness) resize(w, hgt int) { h.send(tea.WindowSizeMsg{Width: w, Height: hgt}) }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tomaslatall/nowplaying-tui/internal/config"
+	"github.com/kraklin/nowplaying-tui/internal/config"
 )
 
 func (m Model) historyRows(n, w int, accentHex string) []string {

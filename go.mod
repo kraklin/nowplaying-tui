@@ -1,4 +1,4 @@
-module github.com/tomaslatall/nowplaying-tui
+module github.com/kraklin/nowplaying-tui
 
 go 1.26.0
 
