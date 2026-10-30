@@ -429,3 +429,42 @@ func TestHelpMentionsTheHistoryKey(t *testing.T) {
 }
 
 func keyRunes(k string) tea.KeyMsg { return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)} }
+
+// On a fresh install the history starts empty and fills up. In a tight stacked
+// pane the cover must not shrink step by step while that happens.
+func TestStackedCoverDoesNotResizeAsHistoryFills(t *testing.T) {
+	for _, sz := range [][2]int{{60, 30}, {50, 28}, {80, 46}, {70, 40}, {66, 36}} {
+		h := newHarness(playing(0, 200*time.Second), Deps{})
+		h.resize(sz[0], sz[1])
+		if h.m.layout().mode != stacked {
+			t.Fatalf("%v should stack", sz)
+		}
+		demo := history.Demo()
+		want := h.m.layout().coverPx
+		prevRows := -1
+		for n := 0; n <= len(demo); n++ {
+			h.m.recent = demo[:n]
+			l := h.m.layout()
+			if l.coverPx != want {
+				t.Errorf("%v: the cover is %dpx with %d entries but %dpx with none", sz, l.coverPx, n, want)
+			}
+			if l.histRows < prevRows {
+				t.Errorf("%v: visible rows went down as entries were added (%d -> %d)", sz, prevRows, l.histRows)
+			}
+			if l.histRows > n {
+				t.Errorf("%v: %d rows shown for %d entries", sz, l.histRows, n)
+			}
+			prevRows = l.histRows
+		}
+	}
+}
+
+func TestHidingHistoryNeverShrinksTheStackedCover(t *testing.T) {
+	h := newHarness(playing(0, 200*time.Second), Deps{}).withDemoHistory()
+	h.resize(60, 30)
+	shown := h.m.layout().coverPx
+	h.press("r")
+	if hidden := h.m.layout().coverPx; hidden < shown {
+		t.Errorf("hiding the list gives its space back to the cover: %dpx -> %dpx", shown, hidden)
+	}
+}

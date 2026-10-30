@@ -34,7 +34,7 @@ func TestWriteSnapshots(t *testing.T) {
 		return tm.(Model)
 	}
 	write("wide", withVolume(settleBG(t, 90, 22, false, bg)))
-	write("stacked", withVolume(settleBG(t, 56, 36, false, bg)))
+	write("stacked", withVolume(settleBG(t, 58, 44, false, bg)))
 	write("idle", withVolume(settleBG(t, 90, 22, true, bg)))
 	write("text", withVolume(settleFull(t, 80, 17, false, bg, cfgWith(func(c *config.Config) { c.ShowCover = false }))))
 

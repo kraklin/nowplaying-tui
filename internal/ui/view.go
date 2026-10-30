@@ -70,17 +70,23 @@ func (m Model) layout() layout {
 		return layout{mode: sideBySide, coverPx: px, infoW: min(w-px-gap, maxInfoW), histRows: hist(h - infoLines)}
 	}
 	// Stacked: reserve a comfortable cover first, give history what is left, and
-	// let the cover grow into any space still unused.
+	// let the cover grow into any space still unused. The cover is sized for the
+	// history's capacity, not for how many entries exist right now, so it does not
+	// shrink step by step as the first tracks are recorded.
 	want := even(min(m.cfg.ArtMaxPx, 24, w))
-	hr := hist(h - 1 - want/2 - infoLines)
+	capRows := 0
+	if m.showHistory {
+		capRows = max(0, min(h-1-want/2-infoLines, m.cfg.HistorySize))
+	}
 	infoH := infoLines - 2 // no history block
-	if hr > 0 {
-		infoH = infoLines + hr
+	if capRows > 0 {
+		infoH = infoLines + capRows
 	}
 	px := even(min((h-1-infoH)*2, m.cfg.ArtMaxPx, w))
 	if px < 8 {
 		return text()
 	}
+	hr := min(capRows, len(m.recent))
 	return layout{mode: stacked, coverPx: px, infoW: min(w, 60), histRows: hr}
 }
 
@@ -221,6 +227,13 @@ func (m Model) info(l layout, accentHex string) string {
 	ac := accentStyle(accentHex)
 	s := m.state
 	line := func(x string) string { return lipgloss.NewStyle().Width(w).Render(x) }
+	// Stacked (narrow or portrait) cards centre their text under the cover.
+	align := func(x string) string {
+		if l.mode == stacked {
+			return centerIn(x, w)
+		}
+		return x
+	}
 
 	// A note (error, confirmation) takes over the label row; it must stay one row.
 	labelRow := m.th.dim.Render("♫  now playing")
@@ -248,9 +261,9 @@ func (m Model) info(l layout, accentHex string) string {
 	transport, _, _ := m.transportRow(ac, w)
 
 	lines := []string{
-		labelRow, "",
-		line(ac.Render(fit(title, w))),
-		line(m.truncStyled(sub, s.Artist+" · "+s.Album, w)), "",
+		align(labelRow), "",
+		line(align(ac.Render(strings.TrimRight(fit(title, w), " ")))),
+		line(align(m.truncStyled(sub, s.Artist+" · "+s.Album, w))), "",
 		line(progress), "",
 		line(transport), "",
 	}
@@ -298,7 +311,17 @@ func (m Model) truncStyled(styled, plain string, w int) string {
 	if lipgloss.Width(plain) <= w {
 		return styled
 	}
-	return m.th.dim.Render(fit(plain, w))
+	return m.th.dim.Render(strings.TrimRight(fit(plain, w), " "))
+}
+
+// centerIn pads s on both sides to width w (the extra cell, if any, goes right).
+func centerIn(s string, w int) string {
+	pad := w - lipgloss.Width(s)
+	if pad <= 0 {
+		return s
+	}
+	left := pad / 2
+	return strings.Repeat(" ", left) + s + strings.Repeat(" ", pad-left)
 }
 
 func (m Model) bar(ac lipgloss.Style, frac float64, w int) string {
@@ -358,15 +381,31 @@ func (m Model) transportRow(ac lipgloss.Style, w int) (row string, hits []hit, v
 		x += width + len(iconGap)
 	}
 	left := strings.Join(parts, iconGap)
+	lw := lipgloss.Width(left)
+
+	// Stacked cards centre the icons; the volume bar stays at the right edge.
+	lead := 0
+	if m.layout().mode == stacked {
+		lead = max((w-lw)/2, 0)
+	}
 
 	filled := max(m.volume, 0) * volTrackW / 100
 	volume := ic.volume + " " + ac.Render(strings.Repeat("━", filled)) + m.th.dim2.Render(strings.Repeat("─", volTrackW-filled))
-	pad := w - lipgloss.Width(left) - lipgloss.Width(volume)
-	if pad < 2 {
-		return left, hits, [2]int{-1, -1}
+	vw := lipgloss.Width(volume)
+	pad := w - lw - vw // free cells when the icons start at the left edge
+	volShown := pad >= 2
+	if volShown {
+		lead = min(lead, pad-2) // never closer than two cells to the volume bar
 	}
-	vx := w - lipgloss.Width(volume)
-	return left + strings.Repeat(" ", pad) + volume, hits, [2]int{vx, w}
+	for i := range hits {
+		hits[i].x0 += lead
+		hits[i].x1 += lead
+	}
+	if !volShown {
+		return strings.Repeat(" ", lead) + left, hits, [2]int{-1, -1}
+	}
+	gapMid := w - lead - lw - vw
+	return strings.Repeat(" ", lead) + left + strings.Repeat(" ", gapMid) + volume, hits, [2]int{w - vw, w}
 }
 
 func (m Model) historyRows(n, w int) []string {
