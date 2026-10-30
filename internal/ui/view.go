@@ -173,12 +173,18 @@ func (m Model) historyRows(n, w int) []string {
 	rem := w - 3 - 2 - durW - 2
 	titleW := rem * 11 / 20
 	artistW := rem - titleW
+	bg, bright, soft := [3]uint8{18, 18, 18}, [3]uint8{216, 216, 216}, [3]uint8{138, 138, 138}
+	if !m.dark {
+		bg, bright, soft = [3]uint8{255, 255, 255}, [3]uint8{34, 34, 34}, [3]uint8{107, 107, 107}
+	}
 	for i, e := range m.recent[:n] {
+		f := fade(i)
+		brightSt, softSt := fadedStyle(bright, bg, f), fadedStyle(soft, bg, f)
 		dur := fmtDur(int(e.Duration.Seconds()))
-		row := dim2.Render(sprintf("%-2d", i+1)) + " " +
-			fit(e.Title, titleW) + " " +
-			dim.Render(fit(e.Artist, artistW)) + " " +
-			dim.Render(strings.Repeat(" ", durW-len(dur))+dur)
+		row := softSt.Render(sprintf("%-2d", i+1)) + " " +
+			brightSt.Render(fit(e.Title, titleW)) + " " +
+			softSt.Render(fit(e.Artist, artistW)) + " " +
+			softSt.Render(strings.Repeat(" ", durW-len(dur))+dur)
 		rows = append(rows, row)
 	}
 	return rows

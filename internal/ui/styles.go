@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"math"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -52,4 +53,17 @@ func fmtDur(secs int) string {
 		return sprintf("%d:%02d:%02d", h, m, s)
 	}
 	return sprintf("%d:%02d", m, s)
+}
+
+// fade is the visibility of history row i: 1 for the newest, decaying
+// exponentially so older rows drift into the background.
+func fade(i int) float64 { return math.Max(0.12, math.Exp(-0.4*float64(i))) }
+
+// fadedStyle blends base towards the assumed terminal background by 1-f.
+func fadedStyle(base, bg [3]uint8, f float64) lipgloss.Style {
+	var c [3]uint8
+	for k := range c {
+		c[k] = uint8(math.Round(float64(bg[k]) + (float64(base[k])-float64(bg[k]))*f))
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(sprintf("#%02x%02x%02x", c[0], c[1], c[2])))
 }

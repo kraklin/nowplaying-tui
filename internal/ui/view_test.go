@@ -88,3 +88,31 @@ func TestEmptyState(t *testing.T) {
 		t.Errorf("history should stay visible when nothing is playing")
 	}
 }
+
+func TestFadeDecaysExponentially(t *testing.T) {
+	if fade(0) != 1 {
+		t.Errorf("newest row must be fully visible, got %v", fade(0))
+	}
+	for i := 1; i < 12; i++ {
+		if fade(i) > fade(i-1) || fade(i) < 0.12 {
+			t.Errorf("fade(%d)=%v not monotonic or below floor", i, fade(i))
+		}
+	}
+	// exponential, not linear: early steps drop more than late ones
+	if fade(0)-fade(1) <= fade(3)-fade(4) {
+		t.Errorf("decay should flatten out")
+	}
+}
+
+func TestFadedStyleBlend(t *testing.T) {
+	bg, fg := [3]uint8{18, 18, 18}, [3]uint8{218, 218, 218}
+	if got := fadedStyle(fg, bg, 1).GetForeground(); got != lipgloss.Color("#dadada") {
+		t.Errorf("f=1 should keep base, got %v", got)
+	}
+	if got := fadedStyle(fg, bg, 0).GetForeground(); got != lipgloss.Color("#121212") {
+		t.Errorf("f=0 should equal background, got %v", got)
+	}
+	if got := fadedStyle(fg, bg, 0.5).GetForeground(); got != lipgloss.Color("#767676") {
+		t.Errorf("f=0.5 midpoint wrong, got %v", got)
+	}
+}
