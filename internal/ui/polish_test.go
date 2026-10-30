@@ -482,7 +482,7 @@ func cfgWith(f func(*config.Config)) *config.Config {
 
 func TestIconSetsFromConfig(t *testing.T) {
 	for set, want := range map[string][]string{
-		"unicode": {"⏮", "\u23EA\uFE0E", "⏸", "\u23E9\uFE0E", "⏭"},
+		"unicode": {"⏮", "<", "⏸", ">", "⏭"},
 		"basic":   {"|◂", "◂◂", "▮▮", "▸▸", "▸|"},
 		"nerd":    {"\uf048", "\uf049", "\uf04c", "\uf050", "\uf051"},
 	} {
@@ -510,12 +510,6 @@ func TestIconSetsKeepTheRowSteady(t *testing.T) {
 	}
 	if w := lipgloss.Width("⏮⏵⏸⏭"); w != 4 {
 		t.Errorf("⏮ ⏵ ⏸ ⏭ must measure one cell each, got %d for four", w)
-	}
-	if w := lipgloss.Width("\u23EA\uFE0E\u23E9\uFE0E"); w != 2 {
-		t.Errorf("⏪ and ⏩ with the text selector are one cell each, got %d for two", w)
-	}
-	if w := lipgloss.Width("\u23EA\u23E9"); w != 4 {
-		t.Errorf("without the selector they are wide emoji (2 cells each); got %d for two", w)
 	}
 }
 
@@ -847,30 +841,25 @@ func TestGapsBetweenButtonsAreNotClickable(t *testing.T) {
 	}
 }
 
-// ⏪ and ⏩ are colour emoji unless followed by U+FE0E. The default set may use
-// them only with that selector, and must never ask for emoji presentation.
-func TestDefaultIconsAskForTextPresentation(t *testing.T) {
+// The pane border drifts whenever a glyph is drawn at a different width than we
+// measured. Back and forward are ASCII, and nothing in the default set may rely
+// on variation selectors or on emoji-capable fast-forward/rewind symbols.
+func TestDefaultIconsCannotDriftTheBorder(t *testing.T) {
 	ic := unicodeIcons
-	for name, g := range map[string]string{"prev": ic.prev, "back": ic.back, "play": ic.play, "pause": ic.pause, "fwd": ic.fwd, "next": ic.next, "volume": ic.volume} {
-		runes := 0
-		for _, r := range g {
-			if r != '\uFE0E' {
-				runes++
-			}
-		}
-		if got := lipgloss.Width(g); got != runes {
-			t.Errorf("%s %q measures %d cells for %d glyph(s): a wide emoji-style glyph", name, g, got, runes)
-		}
-		if strings.ContainsRune(g, '\uFE0F') {
-			t.Errorf("%s %q asks for emoji presentation", name, g)
-		}
-		for _, r := range g {
-			if (r == '\u23EA' || r == '\u23E9') && !strings.Contains(g, string(r)+"\uFE0E") {
-				t.Errorf("%s %q: U+%04X must be followed by U+FE0E or it is drawn as an emoji", name, g, r)
-			}
-		}
+	if ic.back != "<" || ic.fwd != ">" {
+		t.Errorf("back and forward should be plain < and >, got %q and %q", ic.back, ic.fwd)
 	}
-	if strings.Contains(ic.pause+ic.play+ic.prev+ic.next, "\uFE0F") {
-		t.Errorf("no emoji selector anywhere in the main buttons")
+	for name, g := range map[string]string{"prev": ic.prev, "back": ic.back, "play": ic.play, "pause": ic.pause, "fwd": ic.fwd, "next": ic.next, "volume": ic.volume} {
+		if got, runes := lipgloss.Width(g), len([]rune(g)); got != runes {
+			t.Errorf("%s %q measures %d cells for %d rune(s): a wide glyph", name, g, got, runes)
+		}
+		for _, r := range g {
+			if r == '\uFE0E' || r == '\uFE0F' {
+				t.Errorf("%s %q uses a variation selector, which terminals handle inconsistently", name, g)
+			}
+			if r == '\u23E9' || r == '\u23EA' || r == '\u23EF' {
+				t.Errorf("%s %q is an emoji-presentation symbol (drawn wide in many terminals)", name, g)
+			}
+		}
 	}
 }
