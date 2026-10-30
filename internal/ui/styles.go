@@ -57,7 +57,7 @@ func fmtDur(secs int) string {
 
 // fade is the visibility of history row i: 1 for the newest, decaying
 // exponentially so older rows drift into the background.
-func fade(i int) float64 { return math.Max(0.12, math.Exp(-0.4*float64(i))) }
+func fade(i int) float64 { return math.Max(0.2, math.Exp(-0.22*float64(i))) }
 
 // fadedStyle blends base towards the assumed terminal background by 1-f.
 func fadedStyle(base, bg [3]uint8, f float64) lipgloss.Style {

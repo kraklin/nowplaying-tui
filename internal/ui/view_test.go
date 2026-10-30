@@ -94,7 +94,7 @@ func TestFadeDecaysExponentially(t *testing.T) {
 		t.Errorf("newest row must be fully visible, got %v", fade(0))
 	}
 	for i := 1; i < 12; i++ {
-		if fade(i) > fade(i-1) || fade(i) < 0.12 {
+		if fade(i) > fade(i-1) || fade(i) < 0.2 {
 			t.Errorf("fade(%d)=%v not monotonic or below floor", i, fade(i))
 		}
 	}
