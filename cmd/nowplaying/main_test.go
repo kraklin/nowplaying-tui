@@ -40,9 +40,19 @@ func TestLoadConfigDefaultsAndExplicitPath(t *testing.T) {
 	if cfg, warns := loadConfig(p); cfg.Icons != "nerd" || len(warns) != 0 {
 		t.Errorf("explicit file: %+v %v", cfg, warns)
 	}
-	os.MkdirAll(filepath.Join(dir, "nowplay"), 0o755)
-	os.WriteFile(filepath.Join(dir, "nowplay", "config.toml"), []byte("scanlines = false\n"), 0o644)
+	os.MkdirAll(filepath.Join(dir, "nowplaying"), 0o755)
+	os.WriteFile(filepath.Join(dir, "nowplaying", "config.toml"), []byte("scanlines = false\n"), 0o644)
 	if cfg, _ := loadConfig(""); cfg.Scanlines {
 		t.Errorf("the default location should be read")
+	}
+}
+
+func TestLoadConfigStillReadsTheOldFolder(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	os.MkdirAll(filepath.Join(dir, "nowplay"), 0o755)
+	os.WriteFile(filepath.Join(dir, "nowplay", "config.toml"), []byte("icons = \"basic\"\n"), 0o644)
+	if cfg, warns := loadConfig(""); cfg.Icons != "basic" || len(warns) != 0 {
+		t.Errorf("a config from before the rename should still apply: %+v %v", cfg, warns)
 	}
 }

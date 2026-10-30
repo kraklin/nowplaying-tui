@@ -7,10 +7,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/tomaslatall/nowplay/internal/art"
-	"github.com/tomaslatall/nowplay/internal/config"
-	"github.com/tomaslatall/nowplay/internal/history"
-	"github.com/tomaslatall/nowplay/internal/source"
+	"github.com/tomaslatall/nowplaying-tui/internal/art"
+	"github.com/tomaslatall/nowplaying-tui/internal/config"
+	"github.com/tomaslatall/nowplaying-tui/internal/history"
+	"github.com/tomaslatall/nowplaying-tui/internal/source"
 )
 
 var sprintf = fmt.Sprintf

@@ -9,9 +9,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/tomaslatall/nowplay/internal/config"
-	"github.com/tomaslatall/nowplay/internal/history"
-	"github.com/tomaslatall/nowplay/internal/source"
+	"github.com/tomaslatall/nowplaying-tui/internal/config"
+	"github.com/tomaslatall/nowplaying-tui/internal/history"
+	"github.com/tomaslatall/nowplaying-tui/internal/source"
 )
 
 func track(title string) source.State {
@@ -51,7 +51,7 @@ func (h *harness) settle(cmd tea.Cmd) {
 
 func newStoreHarness(t *testing.T) (*harness, *history.Store) {
 	t.Helper()
-	store := history.NewStore(filepath.Join(t.TempDir(), "nowplay", "history.json"), 50)
+	store := history.NewStore(filepath.Join(t.TempDir(), "nowplaying", "history.json"), 50)
 	h := newHarness(track("First"), Deps{History: store})
 	return h, store
 }

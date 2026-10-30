@@ -5,7 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/tomaslatall/nowplay/internal/source"
+	"github.com/tomaslatall/nowplaying-tui/internal/source"
 )
 
 const (
@@ -168,13 +168,13 @@ func (m Model) missingView() string {
 	lines := []string{
 		bold.Render("media-control not found"),
 		"",
-		m.th.dim.Render("nowplay reads what is playing through media-control."),
+		m.th.dim.Render("nowplaying reads what is playing through media-control."),
 		m.th.dim.Render("Install it with:"),
 		"",
 		accent.Render("  brew tap ungive/media-control"),
 		accent.Render("  brew install media-control"),
 		"",
-		m.th.dim.Render("Then start nowplay again. Press q to quit."),
+		m.th.dim.Render("Then start nowplaying again. Press q to quit."),
 	}
 	w := 0
 	for _, ln := range lines {

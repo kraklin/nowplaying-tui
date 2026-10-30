@@ -11,9 +11,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/tomaslatall/nowplay/internal/art"
-	"github.com/tomaslatall/nowplay/internal/history"
-	"github.com/tomaslatall/nowplay/internal/source"
+	"github.com/tomaslatall/nowplaying-tui/internal/art"
+	"github.com/tomaslatall/nowplaying-tui/internal/history"
+	"github.com/tomaslatall/nowplaying-tui/internal/source"
 )
 
 // settle feeds the fake's first state and size, then runs art commands to completion.
@@ -85,7 +85,7 @@ func TestViewFitsPane(t *testing.T) {
 		if got := strings.Contains(out, "▀"); got != c.cover {
 			t.Errorf("%dx%d: cover present = %v, want %v", c.w, c.h, got, c.cover)
 		}
-		if os.Getenv("NOWPLAY_DUMP") != "" {
+		if os.Getenv("NOWPLAYING_DUMP") != "" {
 			t.Logf("%dx%d\n%s", c.w, c.h, out)
 		}
 	}

@@ -9,15 +9,15 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
-	"github.com/tomaslatall/nowplay/internal/source"
+	"github.com/tomaslatall/nowplaying-tui/internal/source"
 )
 
-// Not a real test: with NOWPLAY_SNAPSHOT_DIR set it writes true-colour frames
+// Not a real test: with NOWPLAYING_SNAPSHOT_DIR set it writes true-colour frames
 // that scripts/ansi2svg.py turns into the README screenshots (see README).
 func TestWriteSnapshots(t *testing.T) {
-	dir := os.Getenv("NOWPLAY_SNAPSHOT_DIR")
+	dir := os.Getenv("NOWPLAYING_SNAPSHOT_DIR")
 	if dir == "" {
-		t.Skip("set NOWPLAY_SNAPSHOT_DIR to regenerate the README screenshots")
+		t.Skip("set NOWPLAYING_SNAPSHOT_DIR to regenerate the README screenshots")
 	}
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	defer lipgloss.SetColorProfile(termenv.Ascii)

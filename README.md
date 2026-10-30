@@ -1,10 +1,10 @@
-# nowplay
+# nowplaying-tui
 
-A pixel-art "now playing" card for your terminal. It shows whatever macOS is
+**nowplaying** is a pixel-art "now playing" card for your terminal. It shows whatever macOS is
 playing system-wide (the Spotify desktop app, Apple Music, a browser tab, anything
 that reports to Control Center) and lets you control it from the keyboard or mouse.
 
-![nowplay showing a track, a pixelated cover and the recently played list](docs/wide.svg)
+![nowplaying showing a track, a pixelated cover and the recently played list](docs/wide.svg)
 
 It is a viewer and remote, not a player. It reads macOS Now Playing through
 [`media-control`](https://github.com/ungive/media-control), so there are no API
@@ -13,32 +13,32 @@ keys, no OAuth and no streaming-service APIs. It is built to live in a pane
 80×20 cells and to scale up from there.
 
 **Not included:** playing audio, browsing a library, an "up next" queue (the list
-under the card is what you *recently played*, recorded by nowplay itself).
+under the card is what you *recently played*, recorded by nowplaying itself).
 
 ## Install
 
-nowplay needs macOS and `media-control`:
+nowplaying needs macOS and `media-control`:
 
 ```sh
 brew tap ungive/media-control
 brew install media-control
 ```
 
-Build nowplay with Go 1.26 or newer (older Go versions fetch the right toolchain
+Build nowplaying with Go 1.26 or newer (older Go versions fetch the right toolchain
 automatically):
 
 ```sh
-git clone <this repository> && cd now-playing-tui
-go build -o nowplay ./cmd/nowplay
-install -m 755 nowplay /usr/local/bin/nowplay   # or anywhere on your PATH
+git clone <this repository> && cd nowplaying-tui
+go build -o nowplaying ./cmd/nowplaying
+install -m 755 nowplaying /usr/local/bin/nowplaying   # or anywhere on your PATH
 ```
 
-Run `nowplay`. If `media-control` is missing, nowplay shows the install command
+Run `nowplaying`. If `media-control` is missing, nowplaying shows the install command
 instead of crashing:
 
 ![the install hint shown when media-control is missing](docs/missing.svg)
 
-`nowplay --demo` runs with scripted tracks and generated covers. It needs no
+`nowplaying --demo` runs with scripted tracks and generated covers. It needs no
 external tools, so it works on Linux too.
 
 ## Using it
@@ -92,8 +92,8 @@ at least 36 and at most 64 cells wide. Long titles are cut with `…`, never wra
 
 ## Configuration
 
-nowplay reads `$XDG_CONFIG_HOME/nowplay/config.toml`, or
-`~/.config/nowplay/config.toml`. Every key is optional; these are the defaults:
+nowplaying reads `$XDG_CONFIG_HOME/nowplaying/config.toml`, or
+`~/.config/nowplaying/config.toml`. Every key is optional; these are the defaults:
 
 ```toml
 art_max_px       = 32        # cover size cap in pixels (8-128)
@@ -106,9 +106,9 @@ min_play_seconds = 10        # a track must play this long to enter the history
 background       = ""        # "#1e1e2e": your terminal's background (see below)
 ```
 
-Use another file with `nowplay --config path/to/config.toml`.
+Use another file with `nowplaying --config path/to/config.toml`.
 
-A bad config never stops nowplay. Invalid values fall back to their default, a
+A bad config never stops nowplaying. Invalid values fall back to their default, a
 file that cannot be parsed is ignored, and a short warning appears on the first
 line for a few seconds.
 
@@ -120,7 +120,7 @@ line for a few seconds.
   has at least 3:1 contrast against your terminal background. Setting `accent`
   uses your colour exactly as written.
 - **`background`:** the accent, the dim tones and the history fade are all derived
-  from your terminal's real background colour. nowplay asks the terminal for it;
+  from your terminal's real background colour. nowplaying asks the terminal for it;
   `--background "#rrggbb"` or this key sets it directly and skips the question.
   Precedence: flag, then config, then the terminal's answer.
 
@@ -128,11 +128,20 @@ line for a few seconds.
 
 | File | Location |
 | --- | --- |
-| Config | `$XDG_CONFIG_HOME/nowplay/config.toml`, or `~/.config/nowplay/config.toml` |
-| History | `$XDG_STATE_HOME/nowplay/history.json`, or `~/Library/Application Support/nowplay/history.json` |
+| Config | `$XDG_CONFIG_HOME/nowplaying/config.toml`, or `~/.config/nowplaying/config.toml` |
+| History | `$XDG_STATE_HOME/nowplaying/history.json`, or `~/Library/Application Support/nowplaying/history.json` |
 
 The history is written atomically (temp file + rename). If it ever cannot be
-parsed it is moved to `history.json.corrupt` and nowplay starts with an empty list.
+parsed it is moved to `history.json.corrupt` and nowplaying starts with an empty list.
+
+### Upgrading from `nowplay`
+
+The app used to be called `nowplay`. Your old config and history are still picked
+up: if `nowplaying/` has no file yet, nowplaying reads the one in the old
+`nowplay/` folder (same parent directory), and the first save writes the new
+location. The old files are only ever read, never moved, changed or deleted, so you
+can remove them whenever you like. Anything that launched `nowplay` (a tuios pane,
+a shell alias) needs the new command name.
 
 ### What counts as "recently played"
 
@@ -146,12 +155,12 @@ twice. The same track is never added twice in a row.
 
 - **Nothing happens for about 5 seconds on start.** Your terminal does not answer
   the background-colour query, and Bubble Tea waits for it. Set
-  `background = "#rrggbb"` in the config to avoid nowplay's own query (Bubble Tea's
+  `background = "#rrggbb"` in the config to avoid nowplaying's own query (Bubble Tea's
   startup query happens first and cannot be skipped).
 - **The controls look misaligned, the border drifts, or you see boxes.** A glyph is being
-  drawn at a different width than nowplay measured, or your font lacks it; set
+  drawn at a different width than nowplaying measured, or your font lacks it; set
   `icons = "basic"`.
-- **Browser videos show up.** nowplay shows anything that reports to macOS Now
+- **Browser videos show up.** nowplaying shows anything that reports to macOS Now
   Playing, not just music players.
 
 ## How it works
@@ -161,7 +170,7 @@ One Bubble Tea program is fed by a background source goroutine; everything slow
 `View()` does no I/O.
 
 ```text
-cmd/nowplay        flags, wiring, tea.NewProgram
+cmd/nowplaying        flags, wiring, tea.NewProgram
 internal/source    Source interface; media-control stream parser; scripted fake for --demo
 internal/art       decode, crop, resize, k-means quantise, scanlines, half-block render, accent
 internal/history   what counts as played, the list, atomic JSON store
@@ -186,14 +195,14 @@ testdata/          recorded media-control output and golden renders
 go test ./...                      # unit, golden and end-to-end model tests
 go test -race ./...
 go test ./internal/art -update     # rewrite the golden cover renders
-nowplay --demo                     # try the UI without media-control
+nowplaying --demo                     # try the UI without media-control
 ```
 
 The README screenshots are real frames from the app. To regenerate them:
 
 ```sh
 D=$(mktemp -d)
-NOWPLAY_SNAPSHOT_DIR=$D go test -run TestWriteSnapshots ./internal/ui
+NOWPLAYING_SNAPSHOT_DIR=$D go test -run TestWriteSnapshots ./internal/ui
 for n in wide stacked idle missing; do python3 scripts/ansi2svg.py $D/$n.ansi docs/$n.svg; done
 ```
 

@@ -13,27 +13,27 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/muesli/termenv"
 
-	"github.com/tomaslatall/nowplay/internal/config"
-	"github.com/tomaslatall/nowplay/internal/history"
-	"github.com/tomaslatall/nowplay/internal/source"
-	"github.com/tomaslatall/nowplay/internal/ui"
-	"github.com/tomaslatall/nowplay/internal/volume"
+	"github.com/tomaslatall/nowplaying-tui/internal/config"
+	"github.com/tomaslatall/nowplaying-tui/internal/history"
+	"github.com/tomaslatall/nowplaying-tui/internal/source"
+	"github.com/tomaslatall/nowplaying-tui/internal/ui"
+	"github.com/tomaslatall/nowplaying-tui/internal/volume"
 )
 
 func main() {
 	demo := flag.Bool("demo", false, "run with scripted fake data")
 	bgFlag := flag.String("background", "", "terminal background colour as #rrggbb (default: config, then ask the terminal)")
-	cfgFlag := flag.String("config", "", "config file (default: $XDG_CONFIG_HOME/nowplay/config.toml)")
+	cfgFlag := flag.String("config", "", "config file (default: $XDG_CONFIG_HOME/nowplaying/config.toml)")
 	flag.Parse()
 
 	cfg, warnings := loadConfig(*cfgFlag)
 	for _, w := range warnings {
-		fmt.Fprintln(os.Stderr, "nowplay:", w)
+		fmt.Fprintln(os.Stderr, "nowplaying:", w)
 	}
 
 	bg, err := background(*bgFlag, cfg.Background)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "nowplay:", err)
+		fmt.Fprintln(os.Stderr, "nowplaying:", err)
 		os.Exit(2)
 	}
 
@@ -57,9 +57,12 @@ func main() {
 		}
 		if path, err := history.DefaultPath(); err == nil {
 			deps.History = history.NewStore(path, cfg.HistorySize)
+			if legacy, err := history.LegacyPath(); err == nil {
+				deps.History.Legacy = legacy
+			}
 			var lerr error
 			if recent, lerr = deps.History.Load(); lerr != nil {
-				fmt.Fprintln(os.Stderr, "nowplay:", lerr)
+				fmt.Fprintln(os.Stderr, "nowplaying:", lerr)
 				deps.Warnings = append(deps.Warnings, "history was unreadable; started empty")
 			}
 		}
@@ -86,7 +89,7 @@ func main() {
 	case <-time.After(2 * time.Second):
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "nowplay:", err)
+		fmt.Fprintln(os.Stderr, "nowplaying:", err)
 		os.Exit(1)
 	}
 }
@@ -97,7 +100,7 @@ func loadConfig(flagPath string) (config.Config, []string) {
 	path := flagPath
 	if path == "" {
 		var err error
-		if path, err = config.Path(); err != nil {
+		if path, err = config.DefaultFile(); err != nil {
 			return config.Default(), nil
 		}
 	} else if _, err := os.Stat(path); err != nil {

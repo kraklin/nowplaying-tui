@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tomaslatall/nowplay/internal/source"
+	"github.com/tomaslatall/nowplaying-tui/internal/source"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")

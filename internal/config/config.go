@@ -1,4 +1,4 @@
-// Package config loads ~/.config/nowplay/config.toml. Every key is optional,
+// Package config loads ~/.config/nowplaying/config.toml. Every key is optional,
 // and a bad file never stops the app: invalid values fall back to their
 // defaults and Load reports what it ignored.
 package config
@@ -23,7 +23,7 @@ type Config struct {
 	Icons          string `toml:"icons"`
 	HistorySize    int    `toml:"history_size"`
 	MinPlaySeconds int    `toml:"min_play_seconds"`
-	// Background is the terminal background as "#rrggbb". When set, nowplay
+	// Background is the terminal background as "#rrggbb". When set, nowplaying
 	// does not ask the terminal for it.
 	Background string `toml:"background"`
 }
@@ -39,16 +39,45 @@ func Default() Config {
 	}
 }
 
-// Path is $XDG_CONFIG_HOME/nowplay/config.toml, or ~/.config/nowplay/config.toml.
-func Path() (string, error) {
-	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
-		return filepath.Join(dir, "nowplay", "config.toml"), nil
+const (
+	appDir = "nowplaying"
+	// legacyDir is what the app was called before it was renamed.
+	legacyDir = "nowplay"
+)
+
+func pathIn(dir string) (string, error) {
+	if cfg := os.Getenv("XDG_CONFIG_HOME"); cfg != "" {
+		return filepath.Join(cfg, dir, "config.toml"), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".config", "nowplay", "config.toml"), nil
+	return filepath.Join(home, ".config", dir, "config.toml"), nil
+}
+
+// Path is $XDG_CONFIG_HOME/nowplaying/config.toml, or ~/.config/nowplaying/config.toml.
+func Path() (string, error) { return pathIn(appDir) }
+
+// LegacyPath is where the config lived before the app was renamed from nowplay.
+func LegacyPath() (string, error) { return pathIn(legacyDir) }
+
+// DefaultFile is the file to load when no --config is given: Path, or the legacy
+// file if only that exists. The legacy file is only read, never moved.
+func DefaultFile() (string, error) {
+	p, err := Path()
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(p); err == nil {
+		return p, nil
+	}
+	if lp, lerr := LegacyPath(); lerr == nil {
+		if _, err := os.Stat(lp); err == nil {
+			return lp, nil
+		}
+	}
+	return p, nil
 }
 
 // Load reads path. A missing file gives the defaults and no warnings. Anything
