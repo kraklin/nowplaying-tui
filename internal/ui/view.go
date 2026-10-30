@@ -8,8 +8,8 @@ import (
 
 const (
 	gap        = 4
-	marginX    = 3
-	marginY    = 1
+	marginX    = 6
+	marginY    = 2
 	minInfoW   = 36
 	maxCoverPx = 48
 	infoLines  = 10 // label … "recently played" header, without history rows

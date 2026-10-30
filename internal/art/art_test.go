@@ -1,7 +1,9 @@
 package art
 
 import (
+	"image"
 	"image/color"
+	"strings"
 	"testing"
 )
 
@@ -20,5 +22,25 @@ func TestEnsureContrast(t *testing.T) {
 	ok := color.RGBA{201, 167, 255, 255}
 	if ensureContrast(ok, true) != ok {
 		t.Errorf("already-legible colour should be untouched")
+	}
+}
+
+func TestRoundCorners(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 28, 28))
+	for i := range img.Pix {
+		img.Pix[i] = 255
+	}
+	roundCorners(img)
+	for _, p := range [][2]int{{0, 0}, {27, 0}, {0, 27}, {27, 27}} {
+		if img.RGBAAt(p[0], p[1]).A != 0 {
+			t.Errorf("corner %v should be transparent", p)
+		}
+	}
+	if img.RGBAAt(14, 0).A == 0 || img.RGBAAt(0, 14).A == 0 {
+		t.Errorf("edge midpoints must stay opaque")
+	}
+	out := render(img, nil)
+	if !strings.Contains(out, "▄") || !strings.Contains(out, "▀") {
+		t.Errorf("rounded render should use both half blocks")
 	}
 }

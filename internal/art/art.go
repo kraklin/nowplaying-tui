@@ -37,7 +37,9 @@ func Build(data []byte, px int, dark bool) (Result, error) {
 		return Result{}, err
 	}
 	small := resize(cropSquare(src), px)
-	return Result{Rendered: render(small, nil), Accent: hexColor(ensureContrast(accent(small), dark))}, nil
+	ac := hexColor(ensureContrast(accent(small), dark))
+	roundCorners(small)
+	return Result{Rendered: render(small, nil), Accent: ac}, nil
 }
 
 // Placeholder is a dim gradient with a ♫ in the middle.
@@ -50,6 +52,7 @@ func Placeholder(px int) Result {
 			img.Set(x, y, color.RGBA{v, v, v + 8, 255})
 		}
 	}
+	roundCorners(img)
 	mid := px / 4
 	glyph := func(col, row int) (rune, bool) { return '♫', col == px/2 && row == mid }
 	return Result{Rendered: render(img, glyph), Accent: placeholderAccent}
@@ -92,6 +95,20 @@ func render(img *image.RGBA, glyph func(col, row int) (rune, bool)) string {
 			bot := top
 			if y+1 < b.Dy() {
 				bot = img.RGBAAt(b.Min.X+x, b.Min.Y+y+1)
+			}
+			if top.A == 0 || bot.A == 0 {
+				sb.WriteString("\x1b[0m")
+				have = false
+				switch {
+				case top.A == 0 && bot.A == 0:
+					sb.WriteString(" ")
+				case top.A == 0:
+					fmt.Fprintf(&sb, "\x1b[38;2;%d;%d;%dm▄", bot.R, bot.G, bot.B)
+				default:
+					fmt.Fprintf(&sb, "\x1b[38;2;%d;%d;%dm▀", top.R, top.G, top.B)
+				}
+				sb.WriteString("\x1b[0m")
+				continue
 			}
 			if !have || top != fg {
 				fmt.Fprintf(&sb, "\x1b[38;2;%d;%d;%dm", top.R, top.G, top.B)
@@ -218,4 +235,22 @@ func fromHSL(h, s, l float64) color.RGBA {
 	}
 	m := l - c/2
 	return color.RGBA{uint8((r + m) * 255), uint8((g + m) * 255), uint8((b + m) * 255), 255}
+}
+
+// roundCorners makes the corner pixels transparent, so render lets the
+// terminal background show through them.
+func roundCorners(img *image.RGBA) {
+	n := img.Bounds().Dx()
+	r := max(2, n/10)
+	for y := 0; y < r; y++ {
+		for x := 0; x < r; x++ {
+			dx, dy := float64(r-x)-0.5, float64(r-y)-0.5
+			if math.Hypot(dx, dy) <= float64(r) {
+				continue
+			}
+			for _, p := range [][2]int{{x, y}, {n - 1 - x, y}, {x, n - 1 - y}, {n - 1 - x, n - 1 - y}} {
+				img.SetRGBA(p[0], p[1], color.RGBA{})
+			}
+		}
+	}
 }
