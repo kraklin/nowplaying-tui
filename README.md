@@ -54,7 +54,7 @@ external tools, so it works on Linux too.
 | `?` | Show or hide the key help line |
 | `q`, `ctrl+c` | Quit |
 
-**Mouse:** click the transport row `⏮ ⏴⏴ ⏵ ⏵⏵ ⏭` (previous, back 5 s, play/pause, forward 5 s, next),
+**Mouse:** click the transport row `⏮ ⏪︎ ⏵ ⏩︎ ⏭` (previous, back 5 s, play/pause, forward 5 s, next),
 click the progress bar to seek, and scroll over the volume bar to change the volume. With mouse reporting
 on, most terminals need a modifier (usually Shift, Option in iTerm2) to select
 text. Mouse support also depends on your terminal or multiplexer passing mouse
@@ -112,9 +112,11 @@ A bad config never stops nowplay. Invalid values fall back to their default, a
 file that cannot be parsed is ignored, and a short warning appears on the first
 line for a few seconds.
 
-- **`icons`:** `unicode` uses text symbols only, `⏮ ⏴⏴ ⏵/⏸ ⏵⏵ ⏭` (no emoji, so every
-  glyph is one cell wide). If your font lacks them, use `basic`
-  (`|◂ ◂◂ ▶/▮▮ ▸▸ ▸|`). `nerd` needs a Nerd Font.
+- **`icons`:** `unicode` uses `⏮ ⏪︎ ⏵/⏸ ⏩︎ ⏭`. Back and forward are U+23EA and U+23E9
+  followed by U+FE0E, which asks for the text glyph instead of the colour emoji.
+  Terminals differ in whether they honour that. If yours draws them as wide
+  colour emoji and the row looks off, use `basic` (`|◂ ◂◂ ▶/▮▮ ▸▸ ▸|`).
+  `nerd` needs a Nerd Font.
 - **`accent`:** picked from the cover by default: a k-means pass scored by
   saturation × size that skips near-black and near-white, then adjusted until it
   has at least 3:1 contrast against your terminal background. Setting `accent`
@@ -148,8 +150,8 @@ twice. The same track is never added twice in a row.
   the background-colour query, and Bubble Tea waits for it. Set
   `background = "#rrggbb"` in the config to avoid nowplay's own query (Bubble Tea's
   startup query happens first and cannot be skipped).
-- **The controls look misaligned or show boxes.** Your font may lack the media
-  symbols; set `icons = "basic"`.
+- **The controls look misaligned, wide or show boxes.** Your terminal may ignore the
+  text selector on `⏪︎ ⏩︎`, or your font may lack the media symbols; set `icons = "basic"`.
 - **Browser videos show up.** nowplay shows anything that reports to macOS Now
   Playing, not just music players.
 

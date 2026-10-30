@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -483,7 +482,7 @@ func cfgWith(f func(*config.Config)) *config.Config {
 
 func TestIconSetsFromConfig(t *testing.T) {
 	for set, want := range map[string][]string{
-		"unicode": {"⏮", "⏴⏴", "⏸", "⏵⏵", "⏭"},
+		"unicode": {"⏮", "\u23EA\uFE0E", "⏸", "\u23E9\uFE0E", "⏭"},
 		"basic":   {"|◂", "◂◂", "▮▮", "▸▸", "▸|"},
 		"nerd":    {"\uf048", "\uf049", "\uf04c", "\uf050", "\uf051"},
 	} {
@@ -512,8 +511,11 @@ func TestIconSetsKeepTheRowSteady(t *testing.T) {
 	if w := lipgloss.Width("⏮⏵⏸⏭"); w != 4 {
 		t.Errorf("⏮ ⏵ ⏸ ⏭ must measure one cell each, got %d for four", w)
 	}
-	if w := lipgloss.Width("⏴⏴⏵⏵"); w != 4 {
-		t.Errorf("⏴⏴ and ⏵⏵ are two one-cell glyphs each, got %d for two pairs", w)
+	if w := lipgloss.Width("\u23EA\uFE0E\u23E9\uFE0E"); w != 2 {
+		t.Errorf("⏪ and ⏩ with the text selector are one cell each, got %d for two", w)
+	}
+	if w := lipgloss.Width("\u23EA\u23E9"); w != 4 {
+		t.Errorf("without the selector they are wide emoji (2 cells each); got %d for two", w)
 	}
 }
 
@@ -845,23 +847,30 @@ func TestGapsBetweenButtonsAreNotClickable(t *testing.T) {
 	}
 }
 
-// Emoji-presentation glyphs (⏪ ⏩ …) are drawn wide and in colour by many
-// terminals. In the default set every rune must be one cell, which excludes them.
-func TestDefaultIconsAreTextGlyphsNotEmoji(t *testing.T) {
+// ⏪ and ⏩ are colour emoji unless followed by U+FE0E. The default set may use
+// them only with that selector, and must never ask for emoji presentation.
+func TestDefaultIconsAskForTextPresentation(t *testing.T) {
 	ic := unicodeIcons
 	for name, g := range map[string]string{"prev": ic.prev, "back": ic.back, "play": ic.play, "pause": ic.pause, "fwd": ic.fwd, "next": ic.next, "volume": ic.volume} {
-		if got, runes := lipgloss.Width(g), utf8.RuneCountInString(g); got != runes {
-			t.Errorf("%s %q is %d cells for %d rune(s): that is a wide emoji-style glyph", name, g, got, runes)
+		runes := 0
+		for _, r := range g {
+			if r != '\uFE0E' {
+				runes++
+			}
+		}
+		if got := lipgloss.Width(g); got != runes {
+			t.Errorf("%s %q measures %d cells for %d glyph(s): a wide emoji-style glyph", name, g, got, runes)
 		}
 		if strings.ContainsRune(g, '\uFE0F') {
 			t.Errorf("%s %q asks for emoji presentation", name, g)
 		}
-	}
-	for _, banned := range []string{"⏪", "⏩", "⏯", "▶️", "⏸️"} {
-		for _, g := range []string{ic.prev, ic.back, ic.play, ic.pause, ic.fwd, ic.next} {
-			if strings.Contains(g, banned) {
-				t.Errorf("the default set must not contain %q", banned)
+		for _, r := range g {
+			if (r == '\u23EA' || r == '\u23E9') && !strings.Contains(g, string(r)+"\uFE0E") {
+				t.Errorf("%s %q: U+%04X must be followed by U+FE0E or it is drawn as an emoji", name, g, r)
 			}
 		}
+	}
+	if strings.Contains(ic.pause+ic.play+ic.prev+ic.next, "\uFE0F") {
+		t.Errorf("no emoji selector anywhere in the main buttons")
 	}
 }

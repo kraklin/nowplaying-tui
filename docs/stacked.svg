@@ -1110,12 +1110,10 @@
 <text x="400.5" y="445.32" text-anchor="middle" fill="#9a9aa1">5</text>
 <text x="409.5" y="445.32" text-anchor="middle" fill="#9a9aa1">8</text>
 <text x="22.5" y="481.32" text-anchor="middle" fill="#cdd6f4">⏮</text>
-<text x="58.5" y="481.32" text-anchor="middle" fill="#cdd6f4">⏴</text>
-<text x="67.5" y="481.32" text-anchor="middle" fill="#cdd6f4">⏴</text>
-<text x="103.5" y="481.32" text-anchor="middle" fill="#b92eb2">⏸</text>
-<text x="139.5" y="481.32" text-anchor="middle" fill="#cdd6f4">⏵</text>
-<text x="148.5" y="481.32" text-anchor="middle" fill="#cdd6f4">⏵</text>
-<text x="184.5" y="481.32" text-anchor="middle" fill="#cdd6f4">⏭</text>
+<text x="58.5" y="481.32" text-anchor="middle" fill="#cdd6f4">⏪︎</text>
+<text x="94.5" y="481.32" text-anchor="middle" fill="#b92eb2">⏸</text>
+<text x="130.5" y="481.32" text-anchor="middle" fill="#cdd6f4">⏩︎</text>
+<text x="166.5" y="481.32" text-anchor="middle" fill="#cdd6f4">⏭</text>
 <text x="310.5" y="481.32" text-anchor="middle" fill="#cdd6f4">♪</text>
 <text x="328.5" y="481.32" text-anchor="middle" fill="#b92eb2">━</text>
 <text x="337.5" y="481.32" text-anchor="middle" fill="#b92eb2">━</text>

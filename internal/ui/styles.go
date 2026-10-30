@@ -16,13 +16,14 @@ type icons struct {
 	prev, back, play, pause, fwd, next, volume string
 }
 
-// Icon sets, chosen with `icons` in the config. The default set uses text
-// symbols only: each rune is one cell wide and none has an emoji presentation
-// (⏪ and ⏩ do, which is why back and forward are ⏴⏴ and ⏵⏵). Play and pause
-// match in width so the transport row never shifts.
+// Icon sets, chosen with `icons` in the config. Back and forward are U+23EA and
+// U+23E9 followed by U+FE0E, the variation selector that asks for the text
+// glyph instead of the colour emoji; it makes them measure one cell. A terminal
+// that ignores the selector draws them wide, which is what `basic` is for. Play
+// and pause match in width so the transport row never shifts.
 var (
-	unicodeIcons = icons{"⏮", "⏴⏴", "⏵", "⏸", "⏵⏵", "⏭", "♪"}
-	// basicIcons avoids the ⏮ ⏴ ⏵ ⏸ ⏭ block, for fonts that lack it.
+	unicodeIcons = icons{"⏮", "⏪\uFE0E", "⏵", "⏸", "⏩\uFE0E", "⏭", "♪"}
+	// basicIcons avoids the ⏮ ⏪ ⏵ ⏸ ⏩ ⏭ block, for fonts or terminals that draw it badly.
 	basicIcons = icons{"|◂", "◂◂", "▶ ", "▮▮", "▸▸", "▸|", "♪"}
 	// nerdIcons needs a Nerd Font.
 	nerdIcons = icons{"\uf048", "\uf049", "\uf04b", "\uf04c", "\uf050", "\uf051", "\uf028"}

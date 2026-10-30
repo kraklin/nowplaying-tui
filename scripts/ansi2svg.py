@@ -59,6 +59,8 @@ def parse(frame, default_fg):
             w = width(ch)
             if w == 0:
                 continue
+            if pos < len(line) and line[pos] == "\ufe0e":  # text selector: one cell
+                w, ch, pos = 1, ch + "\ufe0e", pos + 1
             cells.append((x, ch, fg or default_fg, bg, bold))
             x += w
         rows.append(cells)

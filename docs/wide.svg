@@ -594,12 +594,10 @@
 <rect x="297" y="162" width="9" height="9" fill="#9c2481"/>
 <rect x="297" y="171" width="9" height="9" fill="#891f71"/>
 <text x="346.5" y="175.32" text-anchor="middle" fill="#cdd6f4">⏮</text>
-<text x="382.5" y="175.32" text-anchor="middle" fill="#cdd6f4">⏴</text>
-<text x="391.5" y="175.32" text-anchor="middle" fill="#cdd6f4">⏴</text>
-<text x="427.5" y="175.32" text-anchor="middle" fill="#b92eb2">⏸</text>
-<text x="463.5" y="175.32" text-anchor="middle" fill="#cdd6f4">⏵</text>
-<text x="472.5" y="175.32" text-anchor="middle" fill="#cdd6f4">⏵</text>
-<text x="508.5" y="175.32" text-anchor="middle" fill="#cdd6f4">⏭</text>
+<text x="382.5" y="175.32" text-anchor="middle" fill="#cdd6f4">⏪︎</text>
+<text x="418.5" y="175.32" text-anchor="middle" fill="#b92eb2">⏸</text>
+<text x="454.5" y="175.32" text-anchor="middle" fill="#cdd6f4">⏩︎</text>
+<text x="490.5" y="175.32" text-anchor="middle" fill="#cdd6f4">⏭</text>
 <text x="580.5" y="175.32" text-anchor="middle" fill="#cdd6f4">♪</text>
 <text x="598.5" y="175.32" text-anchor="middle" fill="#b92eb2">━</text>
 <text x="607.5" y="175.32" text-anchor="middle" fill="#b92eb2">━</text>
