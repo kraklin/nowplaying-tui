@@ -14,12 +14,11 @@ const (
 	maxInfoW   = 64
 	marginY    = 2
 	minInfoW   = 36
-	infoLines  = 9 // title … "recently played" header, without history rows
+	infoLines  = 8 // title … "recently played" header, without history rows
 
 	// Rows inside the info block; the mouse handler relies on them.
 	rowProgress  = 3
 	rowTransport = 5
-	rowVolume    = 6 // the volume bar has its own row under the controls
 
 	// Below this the card drops to its compact form: title, artist, controls + time.
 	compactBelowRows = 10
@@ -104,7 +103,7 @@ type geom struct {
 	infoX, infoY, infoW int
 	// Rows inside the info block holding the progress bar and the controls, for
 	// mouse hit-testing; progRow is -1 when there is no bar (compact card).
-	progRow, ctrlRow, volRow int
+	progRow, ctrlRow int
 }
 
 func (m Model) View() string {
@@ -176,9 +175,9 @@ func (m Model) compose() ([]string, geom) {
 	if m.h > 0 && rows[m.h-1] == "" {
 		rows[m.h-1] = m.bottomRow()
 	}
-	g := geom{infoX: infoX, infoY: infoY, infoW: l.infoW, progRow: rowProgress, ctrlRow: rowTransport, volRow: rowVolume}
+	g := geom{infoX: infoX, infoY: infoY, infoW: l.infoW, progRow: rowProgress, ctrlRow: rowTransport}
 	if l.compact {
-		g.progRow, g.ctrlRow, g.volRow = -1, len(info)-1, -1
+		g.progRow, g.ctrlRow = -1, len(info)-1
 	}
 	return rows, g
 }
@@ -318,14 +317,12 @@ func (m Model) info(l layout, accentHex string) string {
 	}
 	progress := m.progress(ac, w, elapsed)
 	transport, _, _ := m.transportRow(ac, w)
-	volRow, _ := m.volumeRow(ac, w)
 
 	lines := []string{
 		line(align(ac.Render(strings.TrimRight(fit(title, w), " ")))),
 		line(align(m.truncStyled(sub, s.Artist+" · "+s.Album, w))), "",
 		line(progress), "",
-		line(transport),
-		line(volRow), "",
+		line(transport), "",
 	}
 	if l.histRows > 0 {
 		lines = append(lines, m.th.dim.Render("recently played"))
@@ -512,32 +509,36 @@ func (m Model) transportRow(ac lipgloss.Style, w int) (row string, hits []hit, v
 	if m.layout().compact {
 		return m.compactControls(ac, w)
 	}
-	left, hits, lw := m.iconRow(ac, []action{actPrev, actBack, actPlay, actFwd, actNext})
-	lead := max((w-lw)/2, 0)
-	for i := range hits {
-		hits[i].x0 += lead
-		hits[i].x1 += lead
-	}
-	_, vol = m.volumeRow(ac, w)
-	return strings.Repeat(" ", lead) + left, hits, vol
-}
+	ic := m.icons
+	left, hits, _ := m.iconRow(ac, []action{actPrev, actBack, actPlay, actFwd, actNext})
+	lw := lipgloss.Width(left)
 
-// volumeRow is the volume bar on its own row, centred; vol is where it sits (for
-// scrolling), or -1 when the card is too narrow for it. While muted the word
-// "mute" replaces the bar, padded to the same width so nothing moves.
-func (m Model) volumeRow(ac lipgloss.Style, w int) (row string, vol [2]int) {
+	// The icons are centred; the volume bar stays at the right edge.
+	lead := max((w-lw)/2, 0)
+
+	// While muted the word "mute" replaces the bar, padded to the same width so
+	// nothing in the row moves and the scroll region stays where it was.
 	track := ac.Render("mute") + strings.Repeat(" ", volTrackW-len("mute"))
 	if !(m.muted && m.volume >= 0) {
 		filled := max(m.volume, 0) * volTrackW / 100
 		track = ac.Render(strings.Repeat("━", filled)) + m.th.dim2.Render(strings.Repeat("─", volTrackW-filled))
 	}
-	block := m.icons.volume + " " + track
-	bw := lipgloss.Width(block)
-	if bw > w {
-		return "", [2]int{-1, -1}
+	volume := ic.volume + " " + track
+	vw := lipgloss.Width(volume)
+	pad := w - lw - vw // free cells when the icons start at the left edge
+	volShown := pad >= 2
+	if volShown {
+		lead = min(lead, pad-2) // never closer than two cells to the volume bar
 	}
-	lead := (w - bw) / 2
-	return strings.Repeat(" ", lead) + block, [2]int{lead, lead + bw}
+	for i := range hits {
+		hits[i].x0 += lead
+		hits[i].x1 += lead
+	}
+	if !volShown {
+		return strings.Repeat(" ", lead) + left, hits, [2]int{-1, -1}
+	}
+	gapMid := w - lead - lw - vw
+	return strings.Repeat(" ", lead) + left + strings.Repeat(" ", gapMid) + volume, hits, [2]int{w - vw, w}
 }
 
 func (m Model) historyRows(n, w int) []string {

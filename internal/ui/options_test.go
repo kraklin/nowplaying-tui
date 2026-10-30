@@ -396,7 +396,7 @@ func TestHidingHistoryRecentresTheInfoColumnAgainstTheCover(t *testing.T) {
 			label = i
 		}
 	}
-	infoRows := 7 // title … volume, no history block
+	infoRows := 6 // title … transport, no history block
 	coverRows := coverBottom - coverTop + 1
 	if want := coverTop + (coverRows-infoRows)/2; label != want {
 		t.Errorf("info should start at row %d to centre on the cover (rows %d..%d), got %d", want, coverTop, coverBottom, label)
