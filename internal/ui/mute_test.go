@@ -122,12 +122,12 @@ func TestMutedDisplayDoesNotMoveAnythingElse(t *testing.T) {
 			t.Errorf("%v: muting moved click regions: %v %v -> %v %v", sz, hitsBefore, volBefore, hitsAfter, volAfter)
 		}
 		for i := range before {
-			if i != g.infoY+rowTransport && before[i] != after[i] {
+			if i != g.infoY+rowVolume && before[i] != after[i] {
 				t.Errorf("%v: row %d changed when muting", sz, i)
 			}
 		}
-		if row := after[g.infoY+rowTransport]; lipgloss.Width(row) > sz[0] {
-			t.Errorf("%v: the transport row is %d wide", sz, lipgloss.Width(row))
+		if row := after[g.infoY+rowVolume]; lipgloss.Width(row) > sz[0] {
+			t.Errorf("%v: the volume row is %d wide", sz, lipgloss.Width(row))
 		}
 	}
 }
@@ -303,7 +303,7 @@ func TestMuteWordFitsInTheVolumeBlockAtEverySize(t *testing.T) {
 			h, _ := muteHarness(t, w, hgt)
 			h.send(run(h.press("m")))
 			_, g := h.m.compose()
-			row := h.rows()[g.infoY+rowTransport]
+			row := h.rows()[g.infoY+rowVolume]
 			x := cellX(row, "mute")
 			_, _, vol := h.m.transportRow(accentStyle("#000"), g.infoW)
 			if vol[0] < 0 {

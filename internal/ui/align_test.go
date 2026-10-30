@@ -92,22 +92,6 @@ func TestStackedControlsAreCentred(t *testing.T) {
 	}
 }
 
-func TestNarrowStackedCardsShiftIconsOnlyAsMuchAsNeeded(t *testing.T) {
-	h, g := stackedHarness(playing(0, 200*time.Second), 50, 30, Deps{Volume: &fakeVol{}})
-	if g.infoW >= centringNeedsAtLeast {
-		t.Fatalf("setup: a %d-wide card should be too narrow to centre", g.infoW)
-	}
-	ic := h.m.icons
-	row := h.rows()[g.infoY+rowTransport]
-	last := cellX(row, ic.next) + lipgloss.Width(ic.next)
-	if gap := cellX(row, ic.volume) - last; gap != 2 {
-		t.Errorf("icons should sit exactly 2 cells from the volume bar when squeezed, got %d", gap)
-	}
-	if first := cellX(row, ic.prev); first <= g.infoX {
-		t.Errorf("they should still be moved off the left edge (centred as far as possible): first icon at %d, edge %d", first, g.infoX)
-	}
-}
-
 func TestStackedIconsNeverCrowdTheVolumeBar(t *testing.T) {
 	for w := 36; w <= 110; w++ {
 		h, g := stackedHarness(playing(0, 200*time.Second), w, w, Deps{Volume: &fakeVol{}}) // rows ≥ w/2: always portrait or narrow

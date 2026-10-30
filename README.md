@@ -101,9 +101,8 @@ column is at least 36 and at most 64 cells wide. Long titles are cut with `…`,
 never wrapped.
 
 The title, artist line and control icons are always centred; the progress bar and the
-history list keep the full width. The volume bar stays at the right edge of the
-controls row, and in a narrow card the icons move left just far enough to keep two
-cells clear of it.
+history list keep the full width. The volume bar has its own row under the controls,
+centred, so nothing ever competes with the icons for space.
 
 The name of the source (Spotify, Firefox, …) sits in the bottom right corner of the
 pane, and is not shown when nothing is playing. Notes (like `next failed`) and the key

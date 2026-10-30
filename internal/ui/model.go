@@ -461,7 +461,7 @@ func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case tea.MouseButtonWheelUp, tea.MouseButtonWheelDown:
-		if row == g.ctrlRow && vol[0] >= 0 && col >= vol[0] && col < vol[1] {
+		if row == g.volRow && g.volRow >= 0 && vol[0] >= 0 && col >= vol[0] && col < vol[1] {
 			if msg.Button == tea.MouseButtonWheelUp {
 				return m.changeVolume(volStep)
 			}
