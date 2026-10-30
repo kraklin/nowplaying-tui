@@ -11,7 +11,7 @@ const (
 	marginX    = 6
 	marginY    = 2
 	minInfoW   = 36
-	maxCoverPx = 48
+	maxCoverPx = 32
 	infoLines  = 10 // label … "recently played" header, without history rows
 )
 
