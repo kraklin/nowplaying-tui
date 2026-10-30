@@ -19,7 +19,8 @@ type icons struct {
 	shuffle, prev, play, pause, next, repeat, volume string
 }
 
-var unicodeIcons = icons{"⤨", "⏮", "▶", "⏸", "⏭", "↻", "🔈"}
+// Geometric glyphs only: ⏮ ⏸ ⏭ 🔈 render as double-width emoji in many terminals.
+var unicodeIcons = icons{"⇄", "|◂", "▶ ", "▮▮", "▸|", "↻", "♪"}
 
 // fit truncates plain text to w cells with … and pads it with spaces to w.
 func fit(s string, w int) string {

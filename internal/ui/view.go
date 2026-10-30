@@ -8,6 +8,8 @@ import (
 
 const (
 	gap        = 4
+	marginX    = 3
+	marginY    = 1
 	minInfoW   = 36
 	maxCoverPx = 48
 	infoLines  = 10 // label … "recently played" header, without history rows
@@ -29,27 +31,27 @@ type layout struct {
 }
 
 func (m Model) layout() layout {
-	w, h := m.w, m.h
+	w, h := max(m.w-2*marginX, 0), max(m.h-2*marginY, 0)
 	hist := func(rows int) int { return max(0, min(rows, len(m.recent))) }
 	text := func() layout {
-		return layout{mode: textOnly, infoW: min(max(w-2, 10), 60), histRows: hist(h - infoLines)}
+		return layout{mode: textOnly, infoW: min(max(w, 10), 60), histRows: hist(h - infoLines)}
 	}
-	if w < 40 || h < 12 {
+	if m.w < 40 || m.h < 12 {
 		return text()
 	}
 	even := func(n int) int { return n &^ 1 }
-	if w >= 70 {
+	if m.w >= 70 {
 		px := even(min(h*2, maxCoverPx, w*45/100, w-gap-minInfoW))
 		if px < 8 {
 			return text()
 		}
 		return layout{mode: sideBySide, coverPx: px, infoW: w - px - gap, histRows: hist(h - infoLines)}
 	}
-	px := even(min((h-infoLines-1)*2, maxCoverPx, w-2))
+	px := even(min((h-infoLines-1)*2, maxCoverPx, w))
 	if px < 8 {
 		return text()
 	}
-	return layout{mode: stacked, coverPx: px, infoW: min(w-2, 60)}
+	return layout{mode: stacked, coverPx: px, infoW: min(w, 60)}
 }
 
 func (m Model) View() string {

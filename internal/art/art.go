@@ -31,13 +31,13 @@ func Hash(data []byte) string {
 }
 
 // Build decodes data, centre-crops, downscales to px×px and renders it.
-func Build(data []byte, px int) (Result, error) {
+func Build(data []byte, px int, dark bool) (Result, error) {
 	src, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return Result{}, err
 	}
 	small := resize(cropSquare(src), px)
-	return Result{Rendered: render(small, nil), Accent: accent(small)}, nil
+	return Result{Rendered: render(small, nil), Accent: hexColor(ensureContrast(accent(small), dark))}, nil
 }
 
 // Placeholder is a dim gradient with a ♫ in the middle.
@@ -125,7 +125,7 @@ func overlay(g func(col, row int) (rune, bool), col, row int) (rune, bool) {
 }
 
 // accent is a stand-in until milestone 3: the most saturated, mid-lightness pixel.
-func accent(img *image.RGBA) string {
+func accent(img *image.RGBA) color.RGBA {
 	best, bestScore := color.RGBA{201, 167, 255, 255}, -1.0
 	b := img.Bounds()
 	for y := b.Min.Y; y < b.Max.Y; y++ {
@@ -139,5 +139,83 @@ func accent(img *image.RGBA) string {
 			}
 		}
 	}
-	return fmt.Sprintf("#%02x%02x%02x", best.R, best.G, best.B)
+	return best
+}
+
+func hexColor(c color.RGBA) string { return fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B) }
+
+// ensureContrast moves c's HSL lightness until it reaches 3:1 against an
+// assumed terminal background (near-black when dark, white otherwise).
+func ensureContrast(c color.RGBA, dark bool) color.RGBA {
+	bg, dir := color.RGBA{18, 18, 18, 255}, 0.02
+	if !dark {
+		bg, dir = color.RGBA{255, 255, 255, 255}, -0.02
+	}
+	h, s, l := toHSL(c)
+	for i := 0; i < 50 && contrast(c, bg) < 3; i++ {
+		l = math.Max(0, math.Min(1, l+dir))
+		c = fromHSL(h, s, l)
+	}
+	return c
+}
+
+func luminance(c color.RGBA) float64 {
+	lin := func(v uint8) float64 {
+		f := float64(v) / 255
+		if f <= 0.03928 {
+			return f / 12.92
+		}
+		return math.Pow((f+0.055)/1.055, 2.4)
+	}
+	return 0.2126*lin(c.R) + 0.7152*lin(c.G) + 0.0722*lin(c.B)
+}
+
+func contrast(a, b color.RGBA) float64 {
+	la, lb := luminance(a), luminance(b)
+	if la < lb {
+		la, lb = lb, la
+	}
+	return (la + 0.05) / (lb + 0.05)
+}
+
+func toHSL(c color.RGBA) (h, s, l float64) {
+	r, g, b := float64(c.R)/255, float64(c.G)/255, float64(c.B)/255
+	mx, mn := math.Max(r, math.Max(g, b)), math.Min(r, math.Min(g, b))
+	l = (mx + mn) / 2
+	d := mx - mn
+	if d == 0 {
+		return 0, 0, l
+	}
+	s = d / (1 - math.Abs(2*l-1))
+	switch mx {
+	case r:
+		h = math.Mod((g-b)/d, 6)
+	case g:
+		h = (b-r)/d + 2
+	default:
+		h = (r-g)/d + 4
+	}
+	return math.Mod(h*60+360, 360), s, l
+}
+
+func fromHSL(h, s, l float64) color.RGBA {
+	c := (1 - math.Abs(2*l-1)) * s
+	x := c * (1 - math.Abs(math.Mod(h/60, 2)-1))
+	var r, g, b float64
+	switch int(h / 60) {
+	case 0:
+		r, g, b = c, x, 0
+	case 1:
+		r, g, b = x, c, 0
+	case 2:
+		r, g, b = 0, c, x
+	case 3:
+		r, g, b = 0, x, c
+	case 4:
+		r, g, b = x, 0, c
+	default:
+		r, g, b = c, 0, x
+	}
+	m := l - c/2
+	return color.RGBA{uint8((r + m) * 255), uint8((g + m) * 255), uint8((b + m) * 255), 255}
 }

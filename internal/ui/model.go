@@ -5,6 +5,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/tomaslatall/nowplay/internal/art"
 	"github.com/tomaslatall/nowplay/internal/history"
@@ -40,6 +41,7 @@ type Model struct {
 	cache   map[artKey]art.Result
 	pending map[artKey]bool
 	icons   icons
+	dark    bool
 }
 
 func New(states <-chan source.State, recent []history.Entry) Model {
@@ -51,6 +53,7 @@ func New(states <-chan source.State, recent []history.Entry) Model {
 		cache:   map[artKey]art.Result{},
 		pending: map[artKey]bool{},
 		icons:   unicodeIcons,
+		dark:    lipgloss.HasDarkBackground(),
 	}
 }
 
@@ -60,12 +63,12 @@ func waitState(ch <-chan source.State) tea.Cmd {
 	return func() tea.Msg { return StateMsg(<-ch) }
 }
 
-func renderArt(key artKey, data []byte) tea.Cmd {
+func renderArt(key artKey, data []byte, dark bool) tea.Cmd {
 	return func() tea.Msg {
 		var res art.Result
 		if key.hash == placeholderHash {
 			res = art.Placeholder(key.px)
-		} else if r, err := art.Build(data, key.px); err == nil {
+		} else if r, err := art.Build(data, key.px, dark); err == nil {
 			res = r
 		} else {
 			res = art.Placeholder(key.px)
@@ -96,7 +99,7 @@ func (m *Model) ensureArt() tea.Cmd {
 		return nil
 	}
 	m.pending[key] = true
-	return renderArt(key, m.state.Art)
+	return renderArt(key, m.state.Art, m.dark)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
