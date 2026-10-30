@@ -71,7 +71,7 @@ changes when the player reports the result.
 
 - **Playing / paused:** the bar moves smoothly while playing and freezes when
   paused; the play/pause icon flips and the bar dims.
-- **Nothing playing:** a dim placeholder cover, an empty bar, and your history is
+- **Nothing playing:** a placeholder cover (a gradient from your background to the accent), an empty bar, and your history is
   still visible.
 - **Live streams:** with no duration there is no bar, only the elapsed time.
 - **Reconnecting:** if the `media-control` stream dies it is restarted with a
@@ -163,6 +163,7 @@ line for a few seconds.
   this key only sets the starting state). The accent colour still follows the
   artwork: nowplaying decodes a small copy of the cover just to pick it, and the pick
   does not depend on the cover's size, so resizing the pane never shifts it.
+- **History colours:** the recently played rows lean towards the accent colour and fade into the background further down.
 - **`history_size`:** this is both how many tracks are remembered and the most that
   can be shown (fewer if the pane is short). The default is 10. If you used an earlier
   version with a longer saved list, the next save trims it to this size.
