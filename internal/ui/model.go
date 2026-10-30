@@ -428,11 +428,18 @@ func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	_, g := m.compose()
+	if (msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown) &&
+		g.volRow >= 0 && msg.Y == g.volRow && msg.X >= g.volX0 && msg.X < g.volX1 {
+		if msg.Button == tea.MouseButtonWheelUp {
+			return m.changeVolume(volStep)
+		}
+		return m.changeVolume(-volStep)
+	}
 	row, col := msg.Y-g.infoY, msg.X-g.infoX
 	if col < 0 || col >= g.infoW {
 		return m, nil
 	}
-	_, hits, vol := m.transportRow(accentStyle("#000000"), g.infoW)
+	_, hits := m.transportRow(accentStyle("#000000"), g.infoW)
 	switch msg.Button {
 	case tea.MouseButtonLeft:
 		switch {
@@ -459,13 +466,6 @@ func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					return m.seek(seekStep)
 				}
 			}
-		}
-	case tea.MouseButtonWheelUp, tea.MouseButtonWheelDown:
-		if row == g.ctrlRow && vol[0] >= 0 && col >= vol[0] && col < vol[1] {
-			if msg.Button == tea.MouseButtonWheelUp {
-				return m.changeVolume(volStep)
-			}
-			return m.changeVolume(-volStep)
 		}
 	}
 	return m, nil

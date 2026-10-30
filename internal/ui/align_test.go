@@ -92,23 +92,7 @@ func TestStackedControlsAreCentred(t *testing.T) {
 	}
 }
 
-func TestNarrowStackedCardsShiftIconsOnlyAsMuchAsNeeded(t *testing.T) {
-	h, g := stackedHarness(playing(0, 200*time.Second), 50, 30, Deps{Volume: &fakeVol{}})
-	if g.infoW >= centringNeedsAtLeast {
-		t.Fatalf("setup: a %d-wide card should be too narrow to centre", g.infoW)
-	}
-	ic := h.m.icons
-	row := h.rows()[g.infoY+rowTransport]
-	last := cellX(row, ic.next) + lipgloss.Width(ic.next)
-	if gap := cellX(row, ic.volume) - last; gap != 2 {
-		t.Errorf("icons should sit exactly 2 cells from the volume bar when squeezed, got %d", gap)
-	}
-	if first := cellX(row, ic.prev); first <= g.infoX {
-		t.Errorf("they should still be moved off the left edge (centred as far as possible): first icon at %d, edge %d", first, g.infoX)
-	}
-}
-
-func TestStackedIconsNeverCrowdTheVolumeBar(t *testing.T) {
+func TestStackedIconsStayInsideTheCard(t *testing.T) {
 	for w := 36; w <= 110; w++ {
 		h, g := stackedHarness(playing(0, 200*time.Second), w, w, Deps{Volume: &fakeVol{}}) // rows ≥ w/2: always portrait or narrow
 		if h.m.layout().mode != stacked {
@@ -118,14 +102,14 @@ func TestStackedIconsNeverCrowdTheVolumeBar(t *testing.T) {
 		row := h.rows()[g.infoY+rowTransport]
 		first := cellX(row, ic.prev)
 		last := cellX(row, ic.next) + lipgloss.Width(ic.next)
-		if first < g.infoX {
-			t.Errorf("w=%d: icons start at %d, left of the card at %d", w, first, g.infoX)
+		if first < g.infoX || last > g.infoX+g.infoW {
+			t.Errorf("w=%d: icons span %d..%d, the card is %d..%d", w, first, last, g.infoX, g.infoX+g.infoW)
 		}
-		if vx := cellX(row, ic.volume); vx >= 0 && vx-last < 2 {
-			t.Errorf("w=%d: only %d cells between the icons and the volume bar", w, vx-last)
+		if mid, want := (first+last)/2, g.infoX+g.infoW/2; !near(mid, want) {
+			t.Errorf("w=%d: icons centred on %d, column centre %d", w, mid, want)
 		}
-		if last > g.infoX+g.infoW {
-			t.Errorf("w=%d: icons run past the card", w)
+		if strings.Contains(row, ic.volume) {
+			t.Errorf("w=%d: the volume bar lives in the bottom corner now", w)
 		}
 	}
 }

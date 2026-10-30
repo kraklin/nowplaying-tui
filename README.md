@@ -102,14 +102,14 @@ never wrapped.
 
 Beside the cover the title, artist line and control icons are left-aligned with the
 progress bar; under the cover, or in the text-only card, they are centred. The progress
-bar and the history list always keep the full width. The volume bar stays at the right edge of the
-controls row, and when the icons are centred in a narrow card they move left just far
-enough to keep two cells clear of it.
+bar and the history list always keep the full width.
 
-The name of the source (Spotify, Firefox, …) sits in the bottom right corner of the
-pane, and is not shown when nothing is playing. Notes (like `next failed`) and the key
-help (`?`) share that bottom row, centred; they slide left rather than touch the name, and if the help cannot fit beside it
-the name steps aside until the help is closed.
+The bottom row of the pane holds the corners: the volume bar (`♪ ━━━━━─────`, or the
+word `mute`) in the bottom left, and the name of the source (Spotify, Firefox, …) in the
+bottom right. The name is not shown when nothing is playing. Notes (like `next failed`)
+and the key help (`?`) share that row, centred; they slide sideways rather than touch a
+corner, and if the help cannot fit between them the volume bar, and then the name, step
+aside until the help is closed.
 
 ### Compact card
 

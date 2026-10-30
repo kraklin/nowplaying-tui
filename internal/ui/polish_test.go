@@ -74,7 +74,7 @@ func TestGeometryMatchesWhatIsDrawn(t *testing.T) {
 		if ky != py || kx < g.infoX || kx >= g.infoX+h.m.barWidth(g.infoW) {
 			t.Errorf("%v: knob at (%d,%d) should sit on the progress row inside the bar [%d,%d)", sz, kx, ky, g.infoX, g.infoX+h.m.barWidth(g.infoW))
 		}
-		_, hits, vol := h.m.transportRow(accentStyle("#000000"), g.infoW)
+		_, hits := h.m.transportRow(accentStyle("#000000"), g.infoW)
 		ic := h.m.icons
 		for name, glyph := range map[string]string{"previous": ic.prev, "backward": ic.back, "play/pause": ic.pause, "forward": ic.fwd, "next": ic.next} {
 			x, y := h.find(glyph)
@@ -89,8 +89,8 @@ func TestGeometryMatchesWhatIsDrawn(t *testing.T) {
 				t.Errorf("%v: %s drawn at column %d is not inside any hit span %v", sz, name, x-g.infoX, hits)
 			}
 		}
-		if vx, _ := h.find(ic.volume); vol[0] >= 0 && vx != g.infoX+vol[0] {
-			t.Errorf("%v: volume drawn at %d, geometry says %d", sz, vx, g.infoX+vol[0])
+		if vx, vy := h.find(ic.volume); g.volRow >= 0 && (vx != g.volX0 || vy != g.volRow) {
+			t.Errorf("%v: volume drawn at (%d,%d), geometry says (%d,%d)", sz, vx, vy, g.volX0, g.volRow)
 		}
 	}
 }
@@ -192,7 +192,7 @@ func TestClicksElsewhereDoNothing(t *testing.T) {
 	h := newHarness(playing(0, 200*time.Second), Deps{Control: rec.control, Volume: &fakeVol{}})
 	h.send(VolumeMsg{Level: 50})
 	_, g := h.m.compose()
-	_, hitsRow, _ := h.m.transportRow(accentStyle("#000000"), g.infoW)
+	_, hitsRow := h.m.transportRow(accentStyle("#000000"), g.infoW)
 	lastHitEnd := hitsRow[len(hitsRow)-1].x1
 	px, py := h.find(h.m.icons.prev)
 	for name, pos := range map[string][2]int{
@@ -314,14 +314,13 @@ func TestScrollOverVolumeBar(t *testing.T) {
 		t.Fatal("volume bar not drawn")
 	}
 	_, g := h.m.compose()
-	_, _, vol := h.m.transportRow(accentStyle("#000000"), g.infoW)
 
 	cmd := h.wheel(x+3, y, tea.MouseButtonWheelUp)
 	if cmd == nil || h.m.volume != 55 {
 		t.Fatalf("scrolling up over the bar adds 5, got volume %d", h.m.volume)
 	}
 	h.send(run(cmd))
-	h.wheel(g.infoX+vol[1]-1, y, tea.MouseButtonWheelDown) // last cell of the bar
+	h.wheel(g.volX1-1, y, tea.MouseButtonWheelDown) // last cell of the bar
 	if h.m.volume != 50 {
 		t.Errorf("scrolling down over the bar's last cell subtracts 5, got %d", h.m.volume)
 	}
@@ -732,7 +731,7 @@ func TestHitSpansDoNotOverlap(t *testing.T) {
 	for _, set := range []string{"unicode", "basic", "nerd"} {
 		h := newHarness(playing(0, 200*time.Second), Deps{Config: cfgWith(func(c *config.Config) { c.Icons = set })})
 		_, g := h.m.compose()
-		_, hits, _ := h.m.transportRow(accentStyle("#000000"), g.infoW)
+		_, hits := h.m.transportRow(accentStyle("#000000"), g.infoW)
 		if len(hits) != 5 {
 			t.Fatalf("%s: want 5 buttons, got %d", set, len(hits))
 		}

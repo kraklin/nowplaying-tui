@@ -105,6 +105,10 @@ type geom struct {
 	// Rows inside the info block holding the progress bar and the controls, for
 	// mouse hit-testing; progRow is -1 when there is no bar (compact card).
 	progRow, ctrlRow int
+	// The volume bar sits in the bottom left corner: its row and cell range in
+	// pane coordinates. volRow is -1 when it is not drawn.
+	volRow       int
+	volX0, volX1 int
 }
 
 func (m Model) View() string {
@@ -142,6 +146,7 @@ func (m Model) compose() ([]string, geom) {
 	if m.cfg.Accent != "" {
 		accent = m.cfg.Accent
 	}
+	ac := accentStyle(accent)
 	info := strings.Split(m.info(l, accent), "\n")
 
 	var coverX, coverY, infoX, infoY int
@@ -173,10 +178,14 @@ func (m Model) compose() ([]string, geom) {
 		}
 		rows[r] = paint(segs)
 	}
+	g := geom{infoX: infoX, infoY: infoY, infoW: l.infoW, progRow: rowProgress, ctrlRow: rowTransport, volRow: -1}
 	if m.h > 0 && rows[m.h-1] == "" {
-		rows[m.h-1] = m.bottomRow()
+		var vol [2]int
+		rows[m.h-1], vol = m.bottomRow(ac)
+		if vol[0] >= 0 {
+			g.volRow, g.volX0, g.volX1 = m.h-1, vol[0], vol[1]
+		}
 	}
-	g := geom{infoX: infoX, infoY: infoY, infoW: l.infoW, progRow: rowProgress, ctrlRow: rowTransport}
 	if l.compact {
 		g.progRow, g.ctrlRow = -1, len(info)-1
 	}
@@ -197,26 +206,59 @@ func (m Model) sourceTag() string {
 	return appName(s.App)
 }
 
-// bottomRow is the pane's last row, which the card leaves blank: the source name
-// sits in the right corner, and a note or the key help is centred. The centred
-// text stays centred while it fits clear of the source; if it would touch it, it
-// slides left just far enough (and is cut only if it still does not fit).
-func (m Model) bottomRow() string {
+// volumeBlock is the volume bar: the icon, a space and the bar (or the word
+// "mute"), always volBlockW cells wide so nothing moves when muting.
+func (m Model) volumeBlock(ac lipgloss.Style) string {
+	track := ac.Render("mute") + strings.Repeat(" ", volTrackW-len("mute"))
+	if !(m.muted && m.volume >= 0) {
+		filled := max(m.volume, 0) * volTrackW / 100
+		track = ac.Render(strings.Repeat("━", filled)) + m.th.dim2.Render(strings.Repeat("─", volTrackW-filled))
+	}
+	return m.icons.volume + " " + track
+}
+
+// bottomRow is the pane's last row, which the card leaves blank: the volume bar
+// sits in the left corner, the source name in the right one, and a note or the
+// key help is centred between them. The centred text stays centred while it
+// fits clear of both; if it would touch one, it slides just far enough (and is
+// cut only if it still does not fit). It also returns the volume bar's cell
+// range, or {-1, -1} when it is not drawn.
+func (m Model) bottomRow(ac lipgloss.Style) (string, [2]int) {
 	src := m.sourceTag()
+	vol := m.volumeBlock(ac)
+	vw := lipgloss.Width(vol)
 	if m.layout().compact {
-		src = "" // the compact card has no source; help and notes still use a free row
+		src, vol = "", "" // the compact card has neither; help and notes still use a free row
 	}
-	// The key help is something you asked for: if it cannot fit beside the source
-	// name, the name steps aside until the help is closed.
-	if m.help && m.note == "" && src != "" && lipgloss.Width(helpText) > m.w-lipgloss.Width(src)-2-2-1 {
-		src = ""
+	const edge, clear = 2, 2 // cells from the pane edge, and from the centred text
+	// room is the width between the corners that the centred text can use.
+	room := func() (lo, limit int) {
+		lo, limit = 1, m.w-1
+		if vol != "" {
+			lo = edge + vw + clear
+		}
+		if src != "" {
+			limit = m.w - lipgloss.Width(src) - edge - clear
+		}
+		return lo, limit
 	}
-	srcW := lipgloss.Width(src)
-	limit := m.w - 1 // the centred text must end before this column
-	if src != "" {
-		limit = m.w - srcW - 2 - 2 // two cells clear of the source
+	// The key help is something you asked for: if it cannot fit between the
+	// corners, the volume bar and then the source name step aside until the help
+	// is closed.
+	if m.help && m.note == "" {
+		for _, drop := range []*string{&vol, &src} {
+			if lo, limit := room(); *drop != "" && lipgloss.Width(helpText) > limit-lo-1 {
+				*drop = ""
+			}
+		}
 	}
+	lo, limit := room()
 	var segs []segment
+	volRange := [2]int{-1, -1}
+	if vol != "" && m.w >= edge+vw {
+		segs = append(segs, segment{edge, vol})
+		volRange = [2]int{edge, edge + vw}
+	}
 	centre, style, tail := "", m.th.dim2, ""
 	switch {
 	case m.note != "":
@@ -224,21 +266,22 @@ func (m Model) bottomRow() string {
 	case m.help:
 		centre = helpText
 	}
-	if avail := limit - 1; centre != "" && avail >= 1 {
+	if avail := limit - lo; centre != "" && avail >= 1 {
 		head := strings.TrimRight(fit(centre, min(avail-lipgloss.Width(tail), lipgloss.Width(centre))), " ")
 		if text := head + tail; strings.TrimSpace(text) != "" {
 			cw := lipgloss.Width(text)
 			x := (m.w - cw) / 2
 			if x+cw > limit {
-				x = max(limit-cw, 1)
+				x = limit - cw
 			}
+			x = max(x, lo)
 			segs = append(segs, segment{x, style.Render(text)})
 		}
 	}
-	if src != "" && m.w >= srcW+2 {
-		segs = append(segs, segment{m.w - srcW - 2, m.th.dim2.Render(src)})
+	if src != "" && m.w >= lipgloss.Width(src)+edge {
+		segs = append(segs, segment{m.w - lipgloss.Width(src) - edge, m.th.dim2.Render(src)})
 	}
-	return paint(segs)
+	return paint(segs), volRange
 }
 
 type segment struct {
@@ -321,7 +364,7 @@ func (m Model) info(l layout, accentHex string) string {
 		elapsed = int(s.Position(m.now).Seconds())
 	}
 	progress := m.progress(ac, w, elapsed)
-	transport, _, _ := m.transportRow(ac, w)
+	transport, _ := m.transportRow(ac, w)
 
 	lines := []string{
 		line(align(ac.Render(strings.TrimRight(fit(title, w), " ")))),
@@ -510,44 +553,22 @@ func (m Model) compactInfo(l layout, ac lipgloss.Style) string {
 	return line(controls)
 }
 
-func (m Model) transportRow(ac lipgloss.Style, w int) (row string, hits []hit, vol [2]int) {
+func (m Model) transportRow(ac lipgloss.Style, w int) (row string, hits []hit) {
 	if m.layout().compact {
-		return m.compactControls(ac, w)
+		row, hits, _ := m.compactControls(ac, w)
+		return row, hits
 	}
-	ic := m.icons
 	left, hits, _ := m.iconRow(ac, []action{actPrev, actBack, actPlay, actFwd, actNext})
-	lw := lipgloss.Width(left)
-
-	// The icons are centred (left-aligned beside a cover); the volume bar stays
-	// at the right edge.
-	lead := max((w-lw)/2, 0)
-	if m.layout().mode == sideBySide {
-		lead = 0
-	}
-
-	// While muted the word "mute" replaces the bar, padded to the same width so
-	// nothing in the row moves and the scroll region stays where it was.
-	track := ac.Render("mute") + strings.Repeat(" ", volTrackW-len("mute"))
-	if !(m.muted && m.volume >= 0) {
-		filled := max(m.volume, 0) * volTrackW / 100
-		track = ac.Render(strings.Repeat("━", filled)) + m.th.dim2.Render(strings.Repeat("─", volTrackW-filled))
-	}
-	volume := ic.volume + " " + track
-	vw := lipgloss.Width(volume)
-	pad := w - lw - vw // free cells when the icons start at the left edge
-	volShown := pad >= 2
-	if volShown {
-		lead = min(lead, pad-2) // never closer than two cells to the volume bar
+	// The icons are centred, or left-aligned beside a cover.
+	lead := 0
+	if m.layout().mode != sideBySide {
+		lead = max((w-lipgloss.Width(left))/2, 0)
 	}
 	for i := range hits {
 		hits[i].x0 += lead
 		hits[i].x1 += lead
 	}
-	if !volShown {
-		return strings.Repeat(" ", lead) + left, hits, [2]int{-1, -1}
-	}
-	gapMid := w - lead - lw - vw
-	return strings.Repeat(" ", lead) + left + strings.Repeat(" ", gapMid) + volume, hits, [2]int{w - vw, w}
+	return strings.Repeat(" ", lead) + left, hits
 }
 
 func (m Model) historyRows(n, w int, accentHex string) []string {

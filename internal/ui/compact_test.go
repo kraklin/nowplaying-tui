@@ -185,6 +185,11 @@ func TestLeavingCompactRestoresTheFullCard(t *testing.T) {
 
 // --- the source name sits in the bottom right corner ------------------------------------
 
+// withoutVolume blanks the volume bar out of a bottom row, leaving the rest.
+func withoutVolume(h *harness, row string) string {
+	return strings.Replace(row, stripANSI(h.m.volumeBlock(accentStyle("#000"))), "", 1)
+}
+
 func TestSourceNameIsInTheBottomRightCorner(t *testing.T) {
 	for _, tc := range []struct{ bundle, want string }{
 		{"com.spotify.client", "Spotify"}, {"org.mozilla.firefox", "Firefox"}, {"com.google.Chrome", "Chrome"}, {"com.example.CoolPlayer", "CoolPlayer"},
@@ -194,11 +199,12 @@ func TestSourceNameIsInTheBottomRightCorner(t *testing.T) {
 			st.App = tc.bundle
 			h, g := stackedHarness(st, sz[0], sz[1], Deps{})
 			rows := h.rows()
-			last := rows[len(rows)-1]
+			raw := rows[len(rows)-1]
+			last := withoutVolume(h, raw)
 			if strings.TrimSpace(last) != tc.want {
 				t.Errorf("%s %v: bottom row %q, want just %q", tc.bundle, sz, last, tc.want)
 			}
-			if _, end := span(last); end != sz[0]-2 {
+			if _, end := span(raw); end != sz[0]-2 {
 				t.Errorf("%s %v: the name should end 2 cells from the right edge, ends at %d of %d", tc.bundle, sz, end, sz[0])
 			}
 			if strings.Contains(strings.Join(rows[:len(rows)-1], "\n"), tc.want) {
@@ -217,7 +223,7 @@ func TestSourceNameIsInTheBottomRightCorner(t *testing.T) {
 func TestNoSourceNameWhenNothingIsPlaying(t *testing.T) {
 	h, g := stackedHarness(source.State{}, 100, 30, Deps{})
 	rows := h.rows()
-	if last := strings.TrimSpace(rows[len(rows)-1]); last != "" {
+	if last := strings.TrimSpace(withoutVolume(h, rows[len(rows)-1])); last != "" {
 		t.Errorf("idle has no source: %q", last)
 	}
 	if title := strings.TrimSpace(rows[g.infoY]); title != "nothing playing" {
@@ -325,5 +331,65 @@ func TestHelpWinsOverTheSourceNameWhenTheyDoNotFit(t *testing.T) {
 	wide.press("?")
 	if last := wide.rows()[29]; !strings.Contains(last, "q quit") || !strings.Contains(last, "Spotify") {
 		t.Errorf("when there is room, both show: %q", last)
+	}
+}
+
+// --- the volume bar sits in the bottom left corner ----------------------------------
+
+func TestVolumeBarIsInTheBottomLeftCorner(t *testing.T) {
+	for _, sz := range [][2]int{{100, 30}, {80, 20}, {80, 50}, {60, 24}} {
+		h, g := stackedHarness(playing(0, 200*time.Second), sz[0], sz[1], Deps{Volume: &fakeVol{}})
+		rows := h.rows()
+		x, y := h.find(h.m.icons.volume)
+		if y != sz[1]-1 || x != 2 {
+			t.Errorf("%v: volume icon at (%d,%d), want (2,%d)", sz, x, y, sz[1]-1)
+		}
+		if g.volRow != y || g.volX0 != x {
+			t.Errorf("%v: geometry says row %d col %d", sz, g.volRow, g.volX0)
+		}
+		if strings.Contains(strings.Join(rows[:len(rows)-1], "\n"), h.m.icons.volume) {
+			t.Errorf("%v: the volume bar must appear only in the corner", sz)
+		}
+	}
+}
+
+func TestCompactCardHasNoVolumeBar(t *testing.T) {
+	h, g := compactHarness(playing(0, 200*time.Second), 40, 6, Deps{Volume: &fakeVol{}})
+	if x, _ := h.find(h.m.icons.volume); x >= 0 || g.volRow >= 0 {
+		t.Errorf("the compact card has no volume bar")
+	}
+}
+
+func TestVolumeStaysClearOfNotesAndStepsAsideForHelp(t *testing.T) {
+	h, _ := stackedHarness(playing(0, 200*time.Second), 100, 30, Deps{Volume: &fakeVol{}})
+	h.m.note = "next failed"
+	_, g := h.m.compose()
+	last := h.rows()[29]
+	if g.volRow < 0 || cellX(last, "next failed") < g.volX1+2 {
+		t.Errorf("a note must keep two cells from the volume bar: %q (bar ends %d)", last, g.volX1)
+	}
+	h.m.note = ""
+	h.press("?")
+	_, g = h.m.compose()
+	if last = h.rows()[29]; !strings.Contains(last, "q quit") || g.volRow >= 0 {
+		t.Errorf("the help keeps its keys and the bar steps aside: %q", last)
+	}
+	h.press("?")
+	if _, g = h.m.compose(); g.volRow < 0 {
+		t.Errorf("the bar comes back with the help closed")
+	}
+}
+
+func TestScrollOverTheCornerVolumeBar(t *testing.T) {
+	h, g := stackedHarness(playing(0, 200*time.Second), 100, 30, Deps{Volume: &fakeVol{}})
+	h.send(VolumeMsg{Level: 50})
+	if cmd := h.wheel(g.volX0+3, g.volRow, tea.MouseButtonWheelUp); cmd == nil || h.m.volume != 55 {
+		t.Errorf("scrolling over the corner bar adds 5, got %d", h.m.volume)
+	}
+	before := h.m.volume
+	h.wheel(g.volX1, g.volRow, tea.MouseButtonWheelUp)
+	h.wheel(g.volX0, g.volRow-1, tea.MouseButtonWheelUp)
+	if h.m.volume != before {
+		t.Errorf("scrolling beside the bar must do nothing")
 	}
 }

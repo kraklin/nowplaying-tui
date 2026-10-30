@@ -114,15 +114,18 @@ func TestMutedDisplayDoesNotMoveAnythingElse(t *testing.T) {
 		h, _ := muteHarness(t, sz[0], sz[1])
 		before := h.rows()
 		_, g := h.m.compose()
-		_, hitsBefore, volBefore := h.m.transportRow(accentStyle("#000"), g.infoW)
+		_, hitsBefore := h.m.transportRow(accentStyle("#000"), g.infoW)
+		volBefore := [2]int{g.volX0, g.volX1}
 		h.send(run(h.press("m")))
 		after := h.rows()
-		_, hitsAfter, volAfter := h.m.transportRow(accentStyle("#000"), g.infoW)
+		_, hitsAfter := h.m.transportRow(accentStyle("#000"), g.infoW)
+		_, gAfter := h.m.compose()
+		volAfter := [2]int{gAfter.volX0, gAfter.volX1}
 		if volBefore != volAfter || fmt.Sprint(hitsBefore) != fmt.Sprint(hitsAfter) {
 			t.Errorf("%v: muting moved click regions: %v %v -> %v %v", sz, hitsBefore, volBefore, hitsAfter, volAfter)
 		}
 		for i := range before {
-			if i != g.infoY+rowTransport && before[i] != after[i] {
+			if i != g.infoY+rowTransport && i != g.volRow && before[i] != after[i] {
 				t.Errorf("%v: row %d changed when muting", sz, i)
 			}
 		}
@@ -303,14 +306,12 @@ func TestMuteWordFitsInTheVolumeBlockAtEverySize(t *testing.T) {
 			h, _ := muteHarness(t, w, hgt)
 			h.send(run(h.press("m")))
 			_, g := h.m.compose()
-			row := h.rows()[g.infoY+rowTransport]
-			x := cellX(row, "mute")
-			_, _, vol := h.m.transportRow(accentStyle("#000"), g.infoW)
-			if vol[0] < 0 {
+			if g.volRow < 0 {
 				continue // the volume block is not shown in a very narrow card
 			}
-			if x < g.infoX+vol[0] || x+4 > g.infoX+vol[1] {
-				t.Errorf("%dx%d: the word sits at %d..%d, outside the volume block %d..%d", w, hgt, x, x+4, g.infoX+vol[0], g.infoX+vol[1])
+			x := cellX(h.rows()[g.volRow], "mute")
+			if x < g.volX0 || x+4 > g.volX1 {
+				t.Errorf("%dx%d: the word sits at %d..%d, outside the volume block %d..%d", w, hgt, x, x+4, g.volX0, g.volX1)
 			}
 		}
 	}
