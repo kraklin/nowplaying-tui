@@ -1,34 +1,30 @@
 # nowplaying-tui
 
 **nowplaying** is a pixel-art "now playing" card for your terminal. It shows whatever macOS is
-playing system-wide (the Spotify desktop app, Apple Music, a browser tab, anything
-that reports to Control Center) and lets you control it from the keyboard or mouse.
+playing system-wide (Spotify, Apple Music, a browser tab, anything that reports to
+Control Center) and lets you control it from the keyboard or mouse.
 
 ![nowplaying showing a track, a pixelated cover and the recently played list](docs/wide.svg)
 
 It is a viewer and remote, not a player. It reads macOS Now Playing through
 [`media-control`](https://github.com/ungive/media-control), so there are no API
-keys, no OAuth and no streaming-service APIs. It is built to live in a pane
-(for example inside tuios) at roughly
-80×20 cells and to scale up from there.
+keys and no streaming-service APIs. It is built to live in a pane (for example
+inside tuios) at roughly 80×20 cells and to scale up from there.
 
-**Not included:** playing audio, browsing a library, an "up next" queue (the list
-under the card is what you *recently played*, recorded by nowplaying itself, in memory
-for the session unless you turn on `persist_history`).
+The list under the card is what you *recently played*, recorded by nowplaying
+itself. It lives in memory unless you turn on `persist_history`.
 
 ## Install
 
 nowplaying needs macOS.
 
-With Homebrew (this also installs [`media-control`](https://github.com/ungive/media-control),
-which it reads the playing track through):
+With Homebrew (this also installs `media-control`):
 
 ```sh
 brew install kraklin/tap/nowplaying
 ```
 
-Or build it yourself with Go 1.26 or newer (older Go versions fetch the right
-toolchain automatically), after `brew install media-control`:
+Or build it yourself with Go 1.26 or newer, after `brew install media-control`:
 
 ```sh
 git clone https://github.com/kraklin/nowplaying-tui && cd nowplaying-tui
@@ -36,13 +32,13 @@ go build -ldflags "-X main.version=$(git describe --tags --always)" -o nowplayin
 install -m 755 nowplaying /usr/local/bin/nowplaying   # or anywhere on your PATH
 ```
 
-`nowplaying --version` prints the version. Run `nowplaying`. If `media-control` is missing, nowplaying shows the install command
+Run `nowplaying`. If `media-control` is missing, it shows the install command
 instead of crashing:
 
 ![the install hint shown when media-control is missing](docs/missing.svg)
 
 `nowplaying --demo` runs with scripted tracks and generated covers. It needs no
-external tools, so it works on Linux too.
+external tools, so it works on Linux too. `nowplaying --version` prints the version.
 
 ## Using it
 
@@ -51,88 +47,59 @@ external tools, so it works on Linux too.
 | `space` | Play / pause |
 | `n`, `l` | Next track |
 | `p`, `h` | Previous track |
-| `←` / `→` | Seek −5 s / +5 s (quick presses chain) |
+| `←` / `→` | Seek −5 s / +5 s |
 | `+` / `-` | System volume +5 / −5 (also unmutes) |
-| `m` | Mute / unmute the system volume; the bar shows `mute` while muted |
-| `a` | Show / hide the cover art (the text-only card; the accent colour stays) |
-| `s` | Show / hide the name of the source (Spotify, Firefox, …) in the bottom right corner |
-| `r` | Show or hide the recently played list |
-| `c` | Clear the recently played list (press `c` again to confirm) |
-| `?` | Show or hide the key help line |
+| `m` | Mute / unmute |
+| `a` | Show / hide the cover art |
+| `s` | Show / hide the source name (Spotify, Firefox, …) |
+| `r` | Show / hide the recently played list |
+| `c` | Clear the recently played list (press again to confirm) |
+| `?` | Show / hide the key help line |
 | `q`, `ctrl+c` | Quit |
 
-**Mouse:** click the transport row `⏮ < ⏵ > ⏭` (previous, back 5 s, play/pause, forward 5 s, next),
-click the progress bar to seek, and scroll over the volume bar to change the volume (scrolling also unmutes). With mouse reporting
-on, most terminals need a modifier (usually Shift, Option in iTerm2) to select
-text. Mouse support also depends on your terminal or multiplexer passing mouse
-events through to the pane.
+**Mouse:** click the transport row `⏮ < ⏵ > ⏭`, click the progress bar to seek,
+and scroll over the volume bar to change the volume. Most terminals need a modifier
+(usually Shift, Option in iTerm2) to select text while mouse reporting is on, and your
+terminal or multiplexer must pass mouse events through to the pane.
 
 The card never guesses: a key press runs a `media-control` command, and the card
 changes when the player reports the result.
 
-### States
-
-- **Playing / paused:** the bar moves smoothly while playing and freezes when
-  paused; the play/pause icon flips and the bar dims.
-- **Nothing playing:** a placeholder cover (a gradient from your background to the accent), an empty bar, and your history is
-  still visible.
-- **Live streams:** with no duration there is no bar, only the elapsed time.
-- **Reconnecting:** if the `media-control` stream dies it is restarted with a
-  1 s, 2 s, 5 s, 10 s backoff and `reconnecting…` replaces the source name in the
-  bottom right corner.
-- **Notes:** a failed command or save is shown on the bottom row for a few
-  seconds (for example `next failed`, `history not saved`).
-
 ### Layout
+
+The layout adapts to the pane size:
 
 | Pane | What you get |
 | --- | --- |
-| 70+ columns, landscape | Cover on the left, info on the right, vertically centred |
-| under 70 columns, or portrait | Cover stacked above the info, centred; the history fits underneath when there is room |
+| 70+ columns, landscape | Cover on the left, info on the right |
+| under 70 columns, or portrait | Cover stacked above the info; history underneath if there is room |
 | under 40 columns or 12 rows, or `show_cover = false` | Text only, no cover |
-| under 30 columns or 10 rows | The compact card (below) |
+| under 30 columns or 10 rows | The compact card |
 
-A pane is *portrait* when it is taller than wide as you see it. Terminal cells are
-about twice as tall as they are wide, so that means rows × 2 > columns: 80×41
-stacks, 80×40 does not.
-
-The cover is the largest even number of pixels that fits (two pixels per cell
-vertically), capped by `art_max_px` and, beside the text, at about 45% of the
-width. When stacked, the cover gets a comfortable size first (up to 24 px), the
-history gets whatever is left, and the cover grows into any space still unused.
-Side margins grow with the pane so wide terminals keep breathing room. The info
-column is at least 36 and at most 64 cells wide. Long titles are cut with `…`,
-never wrapped.
-
-Beside the cover the title, artist line and control icons are left-aligned with the
-progress bar; under the cover, or in the text-only card, they are centred. The progress
-bar and the history list always keep the full width.
-
-The bottom row of the pane holds the corners: the volume bar (`♪ ━━━━━─────`, or the
-word `mute`) in the bottom left, and the name of the source (Spotify, Firefox, …) in the
-bottom right. The name is not shown when nothing is playing. Notes (like `next failed`)
-and the key help (`?`) share that row, centred; they slide sideways rather than touch a
-corner, and if the help cannot fit between them the volume bar, and then the name, step
-aside until the help is closed.
-
-### Compact card
-
-In a really small pane (under 10 rows or under 30 columns) everything that is not
-essential goes: no cover, no source name, no progress bar, no volume, no history. What
-is left is the title, the artist and one row with the controls and the time:
-
-![the compact card for very small panes](docs/compact.svg)
-
-With fewer rows it shrinks further: two rows give `title · artist` and the controls;
-one row gives just the controls and the time. In a very narrow card the time goes
-first, then the back and forward buttons, then previous and next, so play/pause is
-always there. The buttons are still clickable; there is no bar to click.
+A pane is *portrait* when rows × 2 > columns, since cells are about twice as tall
+as wide (80×41 stacks, 80×40 does not). Long titles are cut with `…`, never wrapped.
 
 ![the stacked layout used in narrow and portrait panes](docs/stacked.svg)
 
-With `show_cover = false` you get just the text:
-
 ![the text-only layout](docs/text.svg)
+
+The bottom row holds the volume bar (`♪ ━━━━━─────`, or `mute`) on the left and the
+source name on the right. Notes (like `next failed`) and the key help share that row,
+centred, and push the corners aside when they need the room.
+
+**Compact card:** in a really small pane everything non-essential goes, leaving the
+title, the artist and one row with the controls and the time. With fewer rows it
+shrinks further, and play/pause is always kept.
+
+![the compact card for very small panes](docs/compact.svg)
+
+### States
+
+- **Nothing playing:** a placeholder cover, an empty bar, and your history stays visible.
+- **Live streams:** no duration means no bar, only the elapsed time.
+- **Reconnecting:** if the `media-control` stream dies it is restarted with a backoff,
+  and `reconnecting…` replaces the source name.
+- **Notes:** a failed command or save is shown on the bottom row for a few seconds.
 
 ## Configuration
 
@@ -140,8 +107,8 @@ nowplaying reads `$XDG_CONFIG_HOME/nowplaying/config.toml`, or
 `~/.config/nowplaying/config.toml`. Every key is optional; these are the defaults:
 
 ```toml
-show_cover       = true      # false hides the cover: text only
-show_source      = true      # false hides the player name (bottom right; s toggles it)
+show_cover       = true      # false hides the cover: text only (a toggles it)
+show_source      = true      # false hides the player name (s toggles it)
 art_max_px       = 32        # cover size cap in pixels (8-128)
 quantize_colors  = 12        # flat, stylised palette; 0 = off (0-64)
 scanlines        = true      # darken every other pixel row by ~12%
@@ -155,99 +122,40 @@ min_play_seconds = 10        # a track must play this long to enter the history
 background       = ""        # "#1e1e2e": your terminal's background (see below)
 ```
 
-Use another file with `nowplaying --config path/to/config.toml`.
+Use another file with `nowplaying --config path/to/config.toml`. A bad config never
+stops nowplaying: invalid values fall back to their default, an unparseable file is
+ignored, and a short warning appears on the bottom row.
 
-A bad config never stops nowplaying. Invalid values fall back to their default, a
-file that cannot be parsed is ignored, and a short warning appears on the bottom
-row for a few seconds.
-
-- **Keys and config:** every view toggle has a matching setting that decides its
-  starting state: `a` ↔ `show_cover`, `r` ↔ `show_history`, `s` ↔ `show_source`.
-  `?` (help) always starts hidden, `m` (mute) is the live system state, and `c` clears
-  the history, so none of those are settings.
-- **`show_cover`:** `false` shows only the text (`a` toggles the cover while running;
-  this key only sets the starting state). The accent colour still follows the
-  artwork: nowplaying decodes a small copy of the cover just to pick it, and the pick
-  does not depend on the cover's size, so resizing the pane never shifts it.
-- **History colours:** the recently played rows lean towards the accent colour and fade into the background further down.
-- **`history_size`:** this is both how many tracks are remembered and the most that
-  can be shown (fewer if the pane is short). The default is 10.
-- **`persist_history`:** by default the recently played list lives only in memory and
-  starts empty every run; nothing is written to disk. Set it to `true` to save the list
-  after every change and load it again at the next start. A history file from an
-  earlier run is neither read nor deleted while this is off. Pressing `c` always
-  clears the list in memory, and with `persist_history` on it clears the file too.
-- **`show_history` / `history_fade`:** `show_history = false` starts with the list
-  hidden and `r` shows it. Hiding only changes the view: tracks are still recorded.
-  `history_fade = false` turns off the gradient that dims older rows.
-- **`icons`:** `unicode` uses `⏮ < ⏵/⏸ > ⏭`: back and forward are plain ASCII, the
-  rest are single-cell symbols. If the pane border drifts or a glyph looks wrong
-  in your terminal, use `basic` (`|◂ ◂◂ ▶/▮▮ ▸▸ ▸|`). `nerd` needs a Nerd Font.
-- **`accent`:** picked from the cover by default: a k-means pass scored by
-  saturation × size that skips near-black and near-white, then adjusted until it
-  has at least 3:1 contrast against your terminal background. Setting `accent`
-  uses your colour exactly as written.
-- **`background`:** the accent, the dim tones and the history fade are all derived
-  from your terminal's real background colour. nowplaying asks the terminal for it;
-  `--background "#rrggbb"` or this key sets it directly and skips the question.
-  Precedence: flag, then config, then the terminal's answer.
-
-### Files
-
-| File | Location |
-| --- | --- |
-| Config | `$XDG_CONFIG_HOME/nowplaying/config.toml`, or `~/.config/nowplaying/config.toml` |
-| History (only with `persist_history = true`) | `$XDG_STATE_HOME/nowplaying/history.json`, or `~/Library/Application Support/nowplaying/history.json` |
-
-When it is on, the history is written atomically (temp file + rename). If it ever
-cannot be parsed it is moved to `history.json.corrupt` and nowplaying starts with an
-empty list.
+- **Toggles:** `show_cover`, `show_history` and `show_source` only set the starting
+  state of the `a`, `r` and `s` keys.
+- **`persist_history`:** by default nothing is written to disk. When on, the list is
+  saved after every change to `$XDG_STATE_HOME/nowplaying/history.json` (or
+  `~/Library/Application Support/nowplaying/history.json`) and loaded at the next
+  start. `c` clears the file too. An unparseable file is moved to `history.json.corrupt`.
+- **`icons`:** if a glyph looks wrong or the border drifts in your terminal, use
+  `basic`. `nerd` needs a Nerd Font.
+- **`accent`:** picked from the cover by default (skipping near-black and near-white)
+  and adjusted for at least 3:1 contrast against your background. Setting it uses
+  your colour exactly as written.
+- **`background`:** the accent, dim tones and history fade are derived from your
+  terminal's background. nowplaying asks the terminal for it; `--background "#rrggbb"`
+  or this key sets it directly. Precedence: flag, config, terminal.
 
 ### What counts as "recently played"
 
 When the track changes, the previous one is added if it played for at least
-`min_play_seconds`. Paused time does not count, so rapid skipping does not flood
-the list. A track is identified by title and artist only: players change the album
-name and duration mid-track, and counting those as new tracks would list one song
-twice. The same track is never added twice in a row.
+`min_play_seconds` (paused time does not count). A track is identified by title and
+artist only, and the same track is never added twice in a row.
 
 ## Troubleshooting
 
 - **Nothing happens for about 5 seconds on start.** Your terminal does not answer
-  the background-colour query, and Bubble Tea waits for it. Set
-  `background = "#rrggbb"` in the config to avoid nowplaying's own query (Bubble Tea's
-  startup query happens first and cannot be skipped).
-- **The controls look misaligned, the border drifts, or you see boxes.** A glyph is being
-  drawn at a different width than nowplaying measured, or your font lacks it; set
+  the background-colour query. Set `background = "#rrggbb"` in the config to skip
+  nowplaying's own query (Bubble Tea's startup query happens first and cannot be skipped).
+- **The controls look misaligned, the border drifts, or you see boxes.** Set
   `icons = "basic"`.
 - **Browser videos show up.** nowplaying shows anything that reports to macOS Now
   Playing, not just music players.
-
-## How it works
-
-One Bubble Tea program is fed by a background source goroutine; everything slow
-(process I/O, image decoding, `osascript`, saving) runs in `tea.Cmd`s, and
-`View()` does no I/O.
-
-```text
-cmd/nowplaying        flags, wiring, tea.NewProgram
-internal/source    Source interface; media-control stream parser; scripted fake for --demo
-internal/art       decode, crop, resize, k-means quantise, scanlines, half-block render, accent
-internal/history   what counts as played, the list, atomic JSON store
-internal/volume    osascript get/set
-internal/config    TOML config with defaults and validation
-internal/ui        model, view, keys, mouse, theme
-testdata/          recorded media-control output and golden renders
-```
-
-- `media-control stream --micros` prints one JSON envelope per change
-  (`{"type":"data","diff":bool,"payload":{…}}`). A non-diff line replaces the state;
-  a diff line merges keys, and `null` clears one. `testdata/README.md` lists what
-  the recordings showed.
-- The stream runs in its own process group so quitting, or closing the pane,
-  stops the `media-control` wrapper *and* its adapter child.
-- Covers are drawn with `▀`, foreground = top pixel and background = bottom pixel,
-  using raw 24-bit ANSI. Corner pixels are transparent so the corners are rounded.
 
 ## Development
 
@@ -255,20 +163,33 @@ testdata/          recorded media-control output and golden renders
 go test ./...                      # unit, golden and end-to-end model tests
 go test -race ./...
 go test ./internal/art -update     # rewrite the golden cover renders
-nowplaying --demo                     # try the UI without media-control
+nowplaying --demo                  # try the UI without media-control
 ```
 
-The README screenshots are real frames from the app. To regenerate them:
+Code layout:
+
+```text
+cmd/nowplaying     flags, wiring, tea.NewProgram
+internal/source    Source interface; media-control stream parser; scripted fake for --demo
+internal/art       decode, crop, resize, quantise, scanlines, half-block render, accent
+internal/history   what counts as played, the list, atomic JSON store
+internal/volume    osascript get/set
+internal/config    TOML config with defaults and validation
+internal/ui        model, view, keys, mouse, theme
+testdata/          recorded media-control output and golden renders
+```
+
+Everything slow (process I/O, image decoding, `osascript`, saving) runs in
+`tea.Cmd`s, and `View()` does no I/O. `testdata/README.md` describes the recorded
+`media-control` output.
+
+To regenerate the README screenshots:
 
 ```sh
 D=$(mktemp -d)
 NOWPLAYING_SNAPSHOT_DIR=$D go test -run TestWriteSnapshots ./internal/ui
 for n in wide stacked text compact idle missing; do python3 scripts/ansi2svg.py $D/$n.ansi docs/$n.svg; done
 ```
-
-Dependencies: Bubble Tea, Lip Gloss, `golang.org/x/image` (resizing),
-`BurntSushi/toml` (config), and `muesli/termenv` (reading the terminal background;
-already pulled in by Lip Gloss).
 
 ## License
 
