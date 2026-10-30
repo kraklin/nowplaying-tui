@@ -37,6 +37,15 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
+func TestHistoryIsNotPersistedByDefault(t *testing.T) {
+	if Default().PersistHistory {
+		t.Error("the history must stay in the session unless the user opts in")
+	}
+	if cfg, warns := Load(write(t, "persist_history = true\n")); !cfg.PersistHistory || len(warns) != 0 {
+		t.Errorf("persist_history = true should turn it on: %+v %v", cfg, warns)
+	}
+}
+
 func TestNewSwitchesCanBeTurnedOff(t *testing.T) {
 	cfg, warns := Load(write(t, "show_cover = false\nshow_history = false\nhistory_fade = false\nshow_source = false\n"))
 	if cfg.ShowCover || cfg.ShowHistory || cfg.HistoryFade || cfg.ShowSource || len(warns) != 0 {
@@ -87,6 +96,7 @@ scanlines        = false
 accent           = "#c9a7ff"
 icons            = "nerd"
 history_size     = 100
+persist_history  = true
 show_cover       = false
 show_source      = false
 show_history     = false
@@ -96,7 +106,7 @@ background       = "#3b3d4e"
 `))
 	want := Config{
 		ShowCover: false, ShowSource: false, ArtMaxPx: 24, QuantizeColors: 0, Scanlines: false, Accent: "#c9a7ff", Icons: "nerd",
-		HistorySize: 100, ShowHistory: false, HistoryFade: false, MinPlaySeconds: 0, Background: "#3b3d4e",
+		HistorySize: 100, PersistHistory: true, ShowHistory: false, HistoryFade: false, MinPlaySeconds: 0, Background: "#3b3d4e",
 	}
 	if cfg != want || len(warns) != 0 {
 		t.Errorf("got %+v %v", cfg, warns)

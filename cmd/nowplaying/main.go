@@ -109,6 +109,9 @@ func wire(demo bool, cfg config.Config, warnings []string) (source.Source, ui.De
 	if volume.Available() {
 		deps.Volume = volume.New()
 	}
+	if !cfg.PersistHistory {
+		return src, deps, nil // the list lives in memory for this session only
+	}
 	path, err := history.DefaultPath()
 	if err != nil {
 		return src, deps, nil

@@ -25,6 +25,9 @@ type Config struct {
 	Accent         string `toml:"accent"`
 	Icons          string `toml:"icons"`
 	HistorySize    int    `toml:"history_size"`
+	// PersistHistory keeps the recently played list on disk between runs. Off by
+	// default: the list then lives only as long as the session.
+	PersistHistory bool `toml:"persist_history"`
 	// ShowSource false hides the name of the player (bottom right corner).
 	ShowSource bool `toml:"show_source"`
 	// ShowHistory false hides the recently played list at start (r toggles it).

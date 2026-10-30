@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/tomaslatall/nowplaying-tui/internal/config"
 )
 
 func TestBackgroundPrecedence(t *testing.T) {
@@ -67,5 +69,20 @@ func TestVersionString(t *testing.T) {
 	version = ""
 	if got := versionString(); got == "" {
 		t.Error("the version is never empty")
+	}
+}
+
+func TestHistoryIsOnlyStoredOnDiskWhenAskedFor(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	cfg := config.Default()
+	if _, deps, _ := wire(false, cfg, nil); deps.History != nil {
+		t.Error("by default the history is not stored on disk")
+	}
+	cfg.PersistHistory = true
+	if _, deps, _ := wire(false, cfg, nil); deps.History == nil {
+		t.Error("persist_history = true should store it")
+	}
+	if _, deps, recent := wire(true, cfg, nil); deps.History != nil || len(recent) == 0 {
+		t.Error("--demo never touches the disk and starts with sample entries")
 	}
 }

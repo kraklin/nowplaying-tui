@@ -13,7 +13,8 @@ keys, no OAuth and no streaming-service APIs. It is built to live in a pane
 80×20 cells and to scale up from there.
 
 **Not included:** playing audio, browsing a library, an "up next" queue (the list
-under the card is what you *recently played*, recorded by nowplaying itself).
+under the card is what you *recently played*, recorded by nowplaying itself, in memory
+for the session unless you turn on `persist_history`).
 
 ## Install
 
@@ -75,8 +76,9 @@ changes when the player reports the result.
   still visible.
 - **Live streams:** with no duration there is no bar, only the elapsed time.
 - **Reconnecting:** if the `media-control` stream dies it is restarted with a
-  1 s, 2 s, 5 s, 10 s backoff and the label shows `reconnecting…`.
-- **Notes:** a failed command or save is shown on the first line for a few
+  1 s, 2 s, 5 s, 10 s backoff and `reconnecting…` replaces the source name in the
+  bottom right corner.
+- **Notes:** a failed command or save is shown on the bottom row for a few
   seconds (for example `next failed`, `history not saved`).
 
 ### Layout
@@ -144,6 +146,7 @@ scanlines        = true      # darken every other pixel row by ~12%
 accent           = ""        # "#c9a7ff" to override the colour picked from the cover
 icons            = "unicode" # "unicode", "basic" or "nerd"
 history_size     = 10        # entries kept and shown at most (1-500)
+persist_history  = false     # true keeps the list on disk between runs
 show_history     = true      # false starts with the list hidden (r toggles it)
 history_fade     = true      # false draws every history row at full strength
 min_play_seconds = 10        # a track must play this long to enter the history
@@ -153,8 +156,8 @@ background       = ""        # "#1e1e2e": your terminal's background (see below)
 Use another file with `nowplaying --config path/to/config.toml`.
 
 A bad config never stops nowplaying. Invalid values fall back to their default, a
-file that cannot be parsed is ignored, and a short warning appears on the first
-line for a few seconds.
+file that cannot be parsed is ignored, and a short warning appears on the bottom
+row for a few seconds.
 
 - **Keys and config:** every view toggle has a matching setting that decides its
   starting state: `a` ↔ `show_cover`, `r` ↔ `show_history`, `s` ↔ `show_source`.
@@ -166,8 +169,12 @@ line for a few seconds.
   does not depend on the cover's size, so resizing the pane never shifts it.
 - **History colours:** the recently played rows lean towards the accent colour and fade into the background further down.
 - **`history_size`:** this is both how many tracks are remembered and the most that
-  can be shown (fewer if the pane is short). The default is 10. If you used an earlier
-  version with a longer saved list, the next save trims it to this size.
+  can be shown (fewer if the pane is short). The default is 10.
+- **`persist_history`:** by default the recently played list lives only in memory and
+  starts empty every run; nothing is written to disk. Set it to `true` to save the list
+  after every change and load it again at the next start. A history file from an
+  earlier run is neither read nor deleted while this is off. Pressing `c` always
+  clears the list in memory, and with `persist_history` on it clears the file too.
 - **`show_history` / `history_fade`:** `show_history = false` starts with the list
   hidden and `r` shows it. Hiding only changes the view: tracks are still recorded.
   `history_fade = false` turns off the gradient that dims older rows.
@@ -188,19 +195,11 @@ line for a few seconds.
 | File | Location |
 | --- | --- |
 | Config | `$XDG_CONFIG_HOME/nowplaying/config.toml`, or `~/.config/nowplaying/config.toml` |
-| History | `$XDG_STATE_HOME/nowplaying/history.json`, or `~/Library/Application Support/nowplaying/history.json` |
+| History (only with `persist_history = true`) | `$XDG_STATE_HOME/nowplaying/history.json`, or `~/Library/Application Support/nowplaying/history.json` |
 
-The history is written atomically (temp file + rename). If it ever cannot be
-parsed it is moved to `history.json.corrupt` and nowplaying starts with an empty list.
-
-### Upgrading from `nowplay`
-
-The app used to be called `nowplay`. Your old config and history are still picked
-up: if `nowplaying/` has no file yet, nowplaying reads the one in the old
-`nowplay/` folder (same parent directory), and the first save writes the new
-location. The old files are only ever read, never moved, changed or deleted, so you
-can remove them whenever you like. Anything that launched `nowplay` (a tuios pane,
-a shell alias) needs the new command name.
+When it is on, the history is written atomically (temp file + rename). If it ever
+cannot be parsed it is moved to `history.json.corrupt` and nowplaying starts with an
+empty list.
 
 ### What counts as "recently played"
 
