@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -20,11 +21,30 @@ import (
 	"github.com/tomaslatall/nowplaying-tui/internal/volume"
 )
 
+// version is set at build time with -ldflags "-X main.version=v1.2.3". Without
+// it the module version from the build info is used (go install ...@v1.2.3).
+var version = ""
+
+func versionString() string {
+	if version != "" {
+		return version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		return bi.Main.Version
+	}
+	return "dev"
+}
+
 func main() {
 	demo := flag.Bool("demo", false, "run with scripted fake data")
 	bgFlag := flag.String("background", "", "terminal background colour as #rrggbb (default: config, then ask the terminal)")
 	cfgFlag := flag.String("config", "", "config file (default: $XDG_CONFIG_HOME/nowplaying/config.toml)")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+	if *showVersion {
+		fmt.Println("nowplaying", versionString())
+		return
+	}
 
 	cfg, warnings := loadConfig(*cfgFlag)
 	for _, w := range warnings {

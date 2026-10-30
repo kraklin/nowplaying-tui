@@ -29,11 +29,11 @@ automatically):
 
 ```sh
 git clone <this repository> && cd nowplaying-tui
-go build -o nowplaying ./cmd/nowplaying
+go build -ldflags "-X main.version=$(git describe --tags --always)" -o nowplaying ./cmd/nowplaying
 install -m 755 nowplaying /usr/local/bin/nowplaying   # or anywhere on your PATH
 ```
 
-Run `nowplaying`. If `media-control` is missing, nowplaying shows the install command
+`nowplaying --version` prints the version. Run `nowplaying`. If `media-control` is missing, nowplaying shows the install command
 instead of crashing:
 
 ![the install hint shown when media-control is missing](docs/missing.svg)
@@ -267,3 +267,7 @@ for n in wide stacked text compact idle missing; do python3 scripts/ansi2svg.py 
 Dependencies: Bubble Tea, Lip Gloss, `golang.org/x/image` (resizing),
 `BurntSushi/toml` (config), and `muesli/termenv` (reading the terminal background;
 already pulled in by Lip Gloss).
+
+## License
+
+[MIT](LICENSE)

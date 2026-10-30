@@ -56,3 +56,16 @@ func TestLoadConfigStillReadsTheOldFolder(t *testing.T) {
 		t.Errorf("a config from before the rename should still apply: %+v %v", cfg, warns)
 	}
 }
+
+func TestVersionString(t *testing.T) {
+	old := version
+	defer func() { version = old }()
+	version = "v1.2.3"
+	if got := versionString(); got != "v1.2.3" {
+		t.Errorf("the build-time version wins, got %q", got)
+	}
+	version = ""
+	if got := versionString(); got == "" {
+		t.Error("the version is never empty")
+	}
+}
