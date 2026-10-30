@@ -42,21 +42,32 @@ func osascript(ctx context.Context, script string) ([]byte, error) {
 	return out, err
 }
 
-// Get returns the output volume, 0-100.
-func (o *Osascript) Get() (int, error) {
-	out, err := o.run(context.Background(), "output volume of (get volume settings)")
+// Read returns the output volume (0-100) and whether the output is muted, in a
+// single osascript call. Mute is a separate switch from the level: muting leaves
+// the level alone.
+func (o *Osascript) Read() (level int, muted bool, err error) {
+	out, err := o.run(context.Background(),
+		`(output volume of (get volume settings) as text) & "," & (output muted of (get volume settings) as text)`)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	s := strings.TrimSpace(string(out))
-	if s == "missing value" {
-		return 0, ErrUnavailable
+	lvl, mute, _ := strings.Cut(s, ",")
+	if lvl == "missing value" {
+		return 0, false, ErrUnavailable
 	}
-	v, err := strconv.Atoi(s)
+	v, err := strconv.Atoi(strings.TrimSpace(lvl))
 	if err != nil {
-		return 0, fmt.Errorf("volume: unexpected osascript output %q", s)
+		return 0, false, fmt.Errorf("volume: unexpected osascript output %q", s)
 	}
-	return max(0, min(v, 100)), nil
+	// A device with a level but no mute switch reports "missing value": not muted.
+	return max(0, min(v, 100)), strings.TrimSpace(mute) == "true", nil
+}
+
+// Get returns the output volume, 0-100.
+func (o *Osascript) Get() (int, error) {
+	level, _, err := o.Read()
+	return level, err
 }
 
 // Set sets the output volume, clamped to 0-100.
@@ -65,10 +76,17 @@ func (o *Osascript) Set(v int) error {
 	return err
 }
 
+// SetMuted mutes or unmutes the output without changing its level.
+func (o *Osascript) SetMuted(muted bool) error {
+	_, err := o.run(context.Background(), fmt.Sprintf("set volume output muted %t", muted))
+	return err
+}
+
 // Fake is an in-memory volume for --demo and tests.
 type Fake struct {
 	mu    sync.Mutex
 	Level int
+	Muted bool
 }
 
 func NewFake(level int) *Fake { return &Fake{Level: level} }
@@ -79,9 +97,22 @@ func (f *Fake) Get() (int, error) {
 	return f.Level, nil
 }
 
+func (f *Fake) Read() (int, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.Level, f.Muted, nil
+}
+
 func (f *Fake) Set(v int) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.Level = max(0, min(v, 100))
+	return nil
+}
+
+func (f *Fake) SetMuted(m bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Muted = m
 	return nil
 }

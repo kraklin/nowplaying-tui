@@ -24,14 +24,16 @@ type TickMsg time.Time
 // VolumeMsg is the result of polling the system volume.
 type VolumeMsg struct {
 	Level int
+	Muted bool
 	Err   error
 }
 
 type volPollMsg struct{}
 
 type volSetMsg struct {
-	sent int
-	err  error
+	level int
+	muted bool
+	err   error
 }
 
 // HistorySavedMsg is the result of writing the history file.
@@ -81,6 +83,13 @@ type Volume interface {
 	Set(int) error
 }
 
+// Muter is implemented by volume backends that can also mute. Read returns the
+// level and the mute state in one round trip, which is what the 2 s poll uses.
+type Muter interface {
+	Read() (level int, muted bool, err error)
+	SetMuted(bool) error
+}
+
 // Deps are the collaborators and settings the model is built from; all are
 // optional.
 type Deps struct {
@@ -107,6 +116,7 @@ type Model struct {
 	th      theme
 
 	volume    int // 0-100, or -1 when unavailable
+	muted     bool
 	volBusy   bool
 	volHold   time.Time
 	seekAt    time.Time
@@ -118,6 +128,7 @@ type Model struct {
 	cfg          config.Config
 	help         bool
 	showHistory  bool
+	showCover    bool
 	tracker      *history.Tracker
 	histMax      int
 	histSeq      uint64
@@ -135,6 +146,7 @@ func New(states <-chan source.State, recent []history.Entry, bg color.RGBA, deps
 	m := Model{
 		cfg:         cfg,
 		showHistory: cfg.ShowHistory,
+		showCover:   cfg.ShowCover,
 		tracker:     history.NewTracker(time.Duration(cfg.MinPlaySeconds) * time.Second),
 		histMax:     cfg.HistorySize,
 		src:         states,
@@ -172,6 +184,10 @@ func (m Model) pollVolume() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
+		if mv, ok := v.(Muter); ok {
+			level, muted, err := mv.Read()
+			return VolumeMsg{Level: level, Muted: muted, Err: err}
+		}
 		level, err := v.Get()
 		return VolumeMsg{Level: level, Err: err}
 	}
@@ -262,9 +278,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		next := tea.Tick(volPollEvery, func(time.Time) tea.Msg { return volPollMsg{} })
 		switch {
 		case msg.Err != nil:
-			m.volume = -1
+			m.volume, m.muted = -1, false
 		case !m.volBusy && !m.clock().Before(m.volHold):
-			m.volume = msg.Level
+			m.volume, m.muted = msg.Level, msg.Muted
 		}
 		return m, next
 	case volPollMsg:
@@ -275,9 +291,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setNote("volume failed")
 			return m, m.pollVolume()
 		}
-		if m.volume != msg.sent { // keys were pressed while the last write ran
+		if m.volume != msg.level || m.muted != msg.muted { // keys were pressed while the last write ran
 			m.volBusy = true
-			return m, setVolume(m.deps.Volume, m.volume)
+			return m, setVolume(m.deps.Volume, m.volume, m.muted)
 		}
 		return m, nil
 	case ControlErrMsg:
@@ -321,9 +337,14 @@ func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "?":
 		m.help = !m.help
 		return m, nil
+	// These change the layout, and with it possibly the cover's size, so ask for
+	// a render of any size we do not have yet.
 	case "r":
 		m.showHistory = !m.showHistory
-		return m, nil
+		return m, m.ensureArt()
+	case "a":
+		m.showCover = !m.showCover
+		return m, m.ensureArt()
 	case "c":
 		if armed {
 			m.recent, m.note = nil, ""
@@ -346,6 +367,8 @@ func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.seek(-seekStep)
 	case "right":
 		return m.seek(seekStep)
+	case "m":
+		return m.toggleMute()
 	case "+", "=":
 		return m.changeVolume(volStep)
 	case "-", "_":
@@ -448,14 +471,41 @@ func (m Model) changeVolume(delta int) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.volume = max(0, min(m.volume+delta, 100))
-	m.volHold = m.clock().Add(volHold)
-	if m.volBusy {
-		return m, nil // the in-flight write's completion sends the latest value
-	}
-	m.volBusy = true
-	return m, setVolume(m.deps.Volume, m.volume)
+	m.muted = false // adjusting the volume unmutes, as in most players
+	return m.writeVolume()
 }
 
-func setVolume(v Volume, level int) tea.Cmd {
-	return func() tea.Msg { return volSetMsg{sent: level, err: v.Set(level)} }
+// toggleMute flips the system mute switch; the level is left alone, so unmuting
+// restores it. It does nothing without a backend that can mute.
+func (m Model) toggleMute() (tea.Model, tea.Cmd) {
+	if _, ok := m.deps.Volume.(Muter); !ok || m.volume < 0 {
+		return m, nil
+	}
+	m.muted = !m.muted
+	return m.writeVolume()
+}
+
+// writeVolume sends the wanted level and mute state. Writes are serialised: while
+// one is running, later key presses only update the wanted state, and the running
+// write's completion sends the latest one.
+func (m Model) writeVolume() (tea.Model, tea.Cmd) {
+	m.volHold = m.clock().Add(volHold)
+	if m.volBusy {
+		return m, nil
+	}
+	m.volBusy = true
+	return m, setVolume(m.deps.Volume, m.volume, m.muted)
+}
+
+func setVolume(v Volume, level int, muted bool) tea.Cmd {
+	return func() tea.Msg {
+		var err error
+		if !muted { // muting leaves the level alone; unmuting sets it first
+			err = v.Set(level)
+		}
+		if mv, ok := v.(Muter); ok && err == nil {
+			err = mv.SetMuted(muted)
+		}
+		return volSetMsg{level: level, muted: muted, err: err}
+	}
 }

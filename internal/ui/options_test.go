@@ -468,3 +468,184 @@ func TestHidingHistoryNeverShrinksTheStackedCover(t *testing.T) {
 		t.Errorf("hiding the list gives its space back to the cover: %dpx -> %dpx", shown, hidden)
 	}
 }
+
+// Toggling something that changes the layout can change the cover's size, and a
+// size we have not rendered yet needs a render command or the cover stays blank.
+func TestHistoryKeyRendersTheCoverItResizes(t *testing.T) {
+	m := settle(t, 60, 30, false)
+	before := m.layout().coverPx
+	tm, cmd := m.Update(keyRunes("r"))
+	hidden := tm.(Model)
+	after := hidden.layout().coverPx
+	if after == before {
+		t.Skipf("setup: hiding the history did not change the cover (%dpx)", before)
+	}
+	key, _ := hidden.wantArt()
+	if _, cached := hidden.cache[key]; cached {
+		t.Skip("setup: the new size was already cached")
+	}
+	if cmd == nil {
+		t.Fatalf("the cover grew from %dpx to %dpx, a size never rendered, but r returned no render command", before, after)
+	}
+	msg, ok := cmd().(ArtMsg)
+	if !ok || msg.Px != after {
+		t.Fatalf("expected a render for %dpx, got %#v", after, msg)
+	}
+	tm, _ = hidden.Update(msg)
+	rows := plain(tm.(Model))
+	cover := 0
+	for _, r := range rows {
+		if strings.ContainsAny(r, "▀▄") {
+			cover++
+		}
+	}
+	if cover != after/2 {
+		t.Errorf("the grown cover should be drawn: %d cover rows, want %d", cover, after/2)
+	}
+}
+
+// --- the a key (cover art) ---------------------------------------------------------
+
+func press(t *testing.T, m Model, k string) (Model, tea.Cmd) {
+	t.Helper()
+	tm, cmd := m.Update(keyRunes(k))
+	return tm.(Model), cmd
+}
+
+// finish runs a render command (if any) and feeds its result back.
+func finish(t *testing.T, m Model, cmd tea.Cmd) Model {
+	t.Helper()
+	if cmd == nil {
+		return m
+	}
+	if msg, ok := cmd().(ArtMsg); ok {
+		tm, _ := m.Update(msg)
+		return tm.(Model)
+	}
+	return m
+}
+
+func hasCover(m Model) bool { return strings.ContainsAny(m.View(), "▀▄") }
+
+func TestCoverKeyHidesAndShowsTheCover(t *testing.T) {
+	m := settle(t, 100, 30, false)
+	if !hasCover(m) {
+		t.Fatal("the cover starts visible")
+	}
+	hidden, cmd := press(t, m, "a")
+	if hasCover(hidden) || hidden.layout().mode != textOnly {
+		t.Errorf("a should hide the cover and give the text-only card (mode %v)", hidden.layout().mode)
+	}
+	for _, want := range []string{"Low Orbit", "now playing", "recently played"} {
+		if !strings.Contains(stripANSI(hidden.View()), want) {
+			t.Errorf("hiding the cover must keep %q", want)
+		}
+	}
+	if len(plain(hidden)) != 30 {
+		t.Errorf("the card must still fill the pane")
+	}
+	shown, cmd2 := press(t, finish(t, hidden, cmd), "a")
+	shown = finish(t, shown, cmd2)
+	if !hasCover(shown) || shown.layout().coverPx != m.layout().coverPx {
+		t.Errorf("a again should bring the same cover back (%dpx vs %dpx)", shown.layout().coverPx, m.layout().coverPx)
+	}
+}
+
+func TestCoverKeyOverridesTheConfigAtRuntime(t *testing.T) {
+	m := settleFull(t, 100, 30, false, art.DarkBG, cfgWith(func(c *config.Config) { c.ShowCover = false }))
+	if hasCover(m) {
+		t.Fatal("show_cover = false starts without a cover")
+	}
+	shown, cmd := press(t, m, "a")
+	if cmd == nil {
+		t.Fatal("showing a cover that was never rendered needs a render command")
+	}
+	shown = finish(t, shown, cmd)
+	if !hasCover(shown) {
+		t.Errorf("a should show the cover even though the config hides it:\n%s", strings.Join(plain(shown), "\n"))
+	}
+	again, cmd2 := press(t, shown, "a")
+	if hasCover(finish(t, again, cmd2)) {
+		t.Errorf("and hide it again")
+	}
+}
+
+func TestHidingTheCoverKeepsTheAccent(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(termenv.Ascii)
+	m := settle(t, 100, 30, false)
+	key, _ := m.wantArt()
+	accent := m.cache[key].Accent
+	c, _ := config.ParseHex(accent)
+	want := sprintf("38;2;%d;%d;%d", c.R, c.G, c.B)
+	hidden, cmd := press(t, m, "a")
+	hidden = finish(t, hidden, cmd)
+	if !strings.Contains(hidden.View(), want) {
+		t.Errorf("the card should keep the track's accent %s after hiding the cover", accent)
+	}
+}
+
+func TestCoverKeyInEveryLayout(t *testing.T) {
+	for _, sz := range [][2]int{{100, 30}, {80, 20}, {60, 40}, {80, 50}, {120, 70}} {
+		h := newHarness(playing(0, 200*time.Second), Deps{}).withDemoHistory()
+		h.resize(sz[0], sz[1])
+		mode, px := h.m.layout().mode, h.m.layout().coverPx
+		if px == 0 {
+			t.Fatalf("%v: setup needs a cover", sz)
+		}
+		h.press("a")
+		if l := h.m.layout(); l.mode != textOnly || l.coverPx != 0 {
+			t.Errorf("%v: hidden cover should be text only, got %+v", sz, l)
+		}
+		rows := h.rows()
+		if len(rows) != sz[1] {
+			t.Errorf("%v: %d rows", sz, len(rows))
+		}
+		for i, r := range rows {
+			if lipgloss.Width(r) > sz[0] {
+				t.Errorf("%v: row %d is %d wide", sz, i, lipgloss.Width(r))
+			}
+		}
+		h.press("a")
+		if l := h.m.layout(); l.mode != mode || l.coverPx != px {
+			t.Errorf("%v: toggling back should restore %v at %dpx, got %+v", sz, mode, px, l)
+		}
+	}
+}
+
+func TestCoverKeyDoesNotTouchPlaybackOrHistory(t *testing.T) {
+	rec := &recorder{}
+	h := newHarness(playing(0, 200*time.Second), Deps{Control: rec.control, Volume: &fakeVol{}}).withDemoHistory()
+	n := len(h.m.recent)
+	h.press("a")
+	h.press("a")
+	if len(rec.cmds) != 0 || len(h.m.recent) != n {
+		t.Errorf("hiding art is only a view change: commands %v, history %d -> %d", rec.cmds, n, len(h.m.recent))
+	}
+}
+
+func TestMouseStillWorksAfterHidingTheCover(t *testing.T) {
+	for _, sz := range [][2]int{{100, 30}, {60, 40}} {
+		rec := &recorder{}
+		h := newHarness(playing(60*time.Second, 200*time.Second), Deps{Control: rec.control}).withDemoHistory()
+		h.resize(sz[0], sz[1])
+		h.press("a")
+		x, y := h.find(h.m.icons.next)
+		run(h.click(x, y))
+		_, g := h.m.compose()
+		run(h.click(g.infoX+5, g.infoY+rowProgress))
+		if len(rec.cmds) != 2 || rec.cmds[0].Kind != source.Next || rec.cmds[1].Kind != source.Seek {
+			t.Errorf("%v: hit-testing must follow the re-centred card: %+v", sz, rec.cmds)
+		}
+	}
+}
+
+func TestHelpMentionsTheCoverKey(t *testing.T) {
+	h := newHarness(playing(0, 200*time.Second), Deps{})
+	h.resize(120, 30)
+	h.press("?")
+	rows := h.rows()
+	if got := rows[len(rows)-1]; !strings.Contains(got, "a art") || !strings.Contains(got, "r history") || !strings.Contains(got, "q quit") {
+		t.Errorf("help should list the cover key: %q", got)
+	}
+}

@@ -345,7 +345,7 @@ func TestScrollWithoutVolumeDoesNothing(t *testing.T) {
 
 func TestHelpLineToggles(t *testing.T) {
 	h := newHarness(playing(0, 200*time.Second), Deps{})
-	h.resize(100, 24)
+	h.resize(140, 24)
 	before := h.rows()
 	if strings.Contains(strings.Join(before, "\n"), "space play/pause") {
 		t.Fatal("help starts hidden")
@@ -360,8 +360,8 @@ func TestHelpLineToggles(t *testing.T) {
 			t.Errorf("the help line must not move the card (row %d changed)", i)
 		}
 	}
-	if x := cellX(after[len(after)-1], "space"); x < 5 {
-		t.Errorf("help should be centred, starts at column %d", x)
+	if st, en := span(after[len(after)-1]); st < 5 || !near(st, 140-en) {
+		t.Errorf("help should be centred in the pane: %d empty cells left, %d right", st, 140-en)
 	}
 	h.press("?")
 	if strings.Contains(h.m.View(), "space play/pause") {

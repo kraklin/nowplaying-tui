@@ -49,14 +49,16 @@ external tools, so it works on Linux too.
 | `n`, `l` | Next track |
 | `p`, `h` | Previous track |
 | `←` / `→` | Seek −5 s / +5 s (quick presses chain) |
-| `+` / `-` | System volume +5 / −5 |
+| `+` / `-` | System volume +5 / −5 (also unmutes) |
+| `m` | Mute / unmute the system volume; the bar shows `mute` while muted |
+| `a` | Show / hide the cover art (the text-only card; the accent colour stays) |
 | `r` | Show or hide the recently played list |
 | `c` | Clear the recently played list (press `c` again to confirm) |
 | `?` | Show or hide the key help line |
 | `q`, `ctrl+c` | Quit |
 
 **Mouse:** click the transport row `⏮ < ⏵ > ⏭` (previous, back 5 s, play/pause, forward 5 s, next),
-click the progress bar to seek, and scroll over the volume bar to change the volume. With mouse reporting
+click the progress bar to seek, and scroll over the volume bar to change the volume (scrolling also unmutes). With mouse reporting
 on, most terminals need a modifier (usually Shift, Option in iTerm2) to select
 text. Mouse support also depends on your terminal or multiplexer passing mouse
 events through to the pane.
@@ -132,7 +134,8 @@ A bad config never stops nowplaying. Invalid values fall back to their default, 
 file that cannot be parsed is ignored, and a short warning appears on the first
 line for a few seconds.
 
-- **`show_cover`:** `false` shows only the text. The accent colour still follows the
+- **`show_cover`:** `false` shows only the text (`a` toggles the cover while running;
+  this key only sets the starting state). The accent colour still follows the
   artwork: nowplaying decodes a small copy of the cover just to pick it, and the pick
   does not depend on the cover's size, so resizing the pane never shifts it.
 - **`history_size`:** this is both how many tracks are remembered and the most that

@@ -23,7 +23,7 @@ const (
 	volTrackW = 10 // cells in the volume bar, after the icon and a space
 	iconGap   = "   "
 
-	helpText = "space play/pause · n/p skip · ←/→ seek · +/- vol · r history · c clear · q quit"
+	helpText = "space play/pause · n/p skip · ←/→ seek · +/- vol · m mute · a art · r history · c clear · q quit"
 )
 
 type layoutMode int
@@ -55,7 +55,7 @@ func (m Model) layout() layout {
 	text := func() layout {
 		return layout{mode: textOnly, infoW: min(max(w, 10), 60), histRows: hist(h - infoLines)}
 	}
-	if !m.cfg.ShowCover || m.w < 40 || m.h < 12 {
+	if !m.showCover || m.w < 40 || m.h < 12 {
 		return text()
 	}
 	even := func(n int) int { return n &^ 1 }
@@ -389,8 +389,14 @@ func (m Model) transportRow(ac lipgloss.Style, w int) (row string, hits []hit, v
 		lead = max((w-lw)/2, 0)
 	}
 
-	filled := max(m.volume, 0) * volTrackW / 100
-	volume := ic.volume + " " + ac.Render(strings.Repeat("━", filled)) + m.th.dim2.Render(strings.Repeat("─", volTrackW-filled))
+	// While muted the word "mute" replaces the bar, padded to the same width so
+	// nothing in the row moves and the scroll region stays where it was.
+	track := ac.Render("mute") + strings.Repeat(" ", volTrackW-len("mute"))
+	if !(m.muted && m.volume >= 0) {
+		filled := max(m.volume, 0) * volTrackW / 100
+		track = ac.Render(strings.Repeat("━", filled)) + m.th.dim2.Render(strings.Repeat("─", volTrackW-filled))
+	}
+	volume := ic.volume + " " + track
 	vw := lipgloss.Width(volume)
 	pad := w - lw - vw // free cells when the icons start at the left edge
 	volShown := pad >= 2
