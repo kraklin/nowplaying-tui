@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/tomaslatall/nowplaying-tui/internal/config"
 	"github.com/tomaslatall/nowplaying-tui/internal/source"
 )
 
@@ -182,35 +183,147 @@ func TestLeavingCompactRestoresTheFullCard(t *testing.T) {
 	}
 }
 
-// --- the first row is the source, not "now playing" -----------------------------------
+// --- the source name sits in the bottom right corner ------------------------------------
 
-func TestFirstRowIsTheSourceName(t *testing.T) {
+func TestSourceNameIsInTheBottomRightCorner(t *testing.T) {
 	for _, tc := range []struct{ bundle, want string }{
 		{"com.spotify.client", "Spotify"}, {"org.mozilla.firefox", "Firefox"}, {"com.google.Chrome", "Chrome"}, {"com.example.CoolPlayer", "CoolPlayer"},
 	} {
-		st := playing(0, 200*time.Second)
-		st.App = tc.bundle
-		h, g := stackedHarness(st, 100, 30, Deps{})
-		all := strings.Join(h.rows(), "\n")
-		if strings.Contains(all, "now playing") || strings.Contains(all, "♫  ") {
-			t.Errorf("%s: the old label is gone:\n%s", tc.bundle, all)
-		}
-		row := strings.TrimSpace(h.rows()[g.infoY])
-		if row != tc.want {
-			t.Errorf("%s: first row %q, want %q", tc.bundle, row, tc.want)
-		}
-		if l, r := margins(t, h, g, 0); !near(l, r) {
-			t.Errorf("%s: the source name should be centred: %d / %d", tc.bundle, l, r)
+		for _, sz := range [][2]int{{100, 30}, {80, 50}, {60, 24}} {
+			st := playing(0, 200*time.Second)
+			st.App = tc.bundle
+			h, g := stackedHarness(st, sz[0], sz[1], Deps{})
+			rows := h.rows()
+			last := rows[len(rows)-1]
+			if strings.TrimSpace(last) != tc.want {
+				t.Errorf("%s %v: bottom row %q, want just %q", tc.bundle, sz, last, tc.want)
+			}
+			if _, end := span(last); end != sz[0]-2 {
+				t.Errorf("%s %v: the name should end 2 cells from the right edge, ends at %d of %d", tc.bundle, sz, end, sz[0])
+			}
+			if strings.Contains(strings.Join(rows[:len(rows)-1], "\n"), tc.want) {
+				t.Errorf("%s %v: the name must appear only in the corner", tc.bundle, sz)
+			}
+			if title := strings.TrimSpace(rows[g.infoY]); title != "Low Orbit" {
+				t.Errorf("%v: the card now starts with the title, got %q", sz, title)
+			}
+			if strings.Contains(strings.Join(rows, "\n"), "now playing") {
+				t.Errorf("no 'now playing' anywhere")
+			}
 		}
 	}
 }
 
-func TestFirstRowIsBlankWhenNothingIsPlaying(t *testing.T) {
+func TestNoSourceNameWhenNothingIsPlaying(t *testing.T) {
 	h, g := stackedHarness(source.State{}, 100, 30, Deps{})
-	if row := strings.TrimSpace(h.rows()[g.infoY]); row != "" {
-		t.Errorf("idle has no source: %q", row)
+	rows := h.rows()
+	if last := strings.TrimSpace(rows[len(rows)-1]); last != "" {
+		t.Errorf("idle has no source: %q", last)
 	}
-	if title := strings.TrimSpace(h.rows()[g.infoY+2]); title != "nothing playing" {
+	if title := strings.TrimSpace(rows[g.infoY]); title != "nothing playing" {
 		t.Errorf("title row %q", title)
+	}
+}
+
+func TestSourceKeyAndConfigToggleTheName(t *testing.T) {
+	h, _ := stackedHarness(playing(0, 200*time.Second), 100, 30, Deps{})
+	if !strings.Contains(h.rows()[29], "Spotify") {
+		t.Fatal("shown by default")
+	}
+	if cmd := h.press("s"); cmd != nil {
+		t.Errorf("hiding the source is only a view change")
+	}
+	if strings.Contains(strings.Join(h.rows(), "\n"), "Spotify") {
+		t.Errorf("s should hide it")
+	}
+	h.press("s")
+	if !strings.Contains(h.rows()[29], "Spotify") {
+		t.Errorf("s again shows it")
+	}
+	off := newHarness(playing(0, 200*time.Second), Deps{Config: cfgWith(func(c *config.Config) { c.ShowSource = false })})
+	off.resize(100, 30)
+	if strings.Contains(strings.Join(off.rows(), "\n"), "Spotify") {
+		t.Errorf("show_source = false starts hidden")
+	}
+	off.press("s")
+	if !strings.Contains(off.rows()[29], "Spotify") {
+		t.Errorf("and s shows it")
+	}
+}
+
+func TestReconnectingShowsEvenWhenTheSourceIsHidden(t *testing.T) {
+	st := playing(0, 200*time.Second)
+	st.Status = source.StatusReconnecting
+	h := newHarness(st, Deps{Config: cfgWith(func(c *config.Config) { c.ShowSource = false })})
+	h.resize(100, 30)
+	if !strings.Contains(h.rows()[29], "reconnecting…") {
+		t.Errorf("a stream problem is not something to hide: %q", h.rows()[29])
+	}
+}
+
+func TestSourceNeverCollidesWithHelpOrNotes(t *testing.T) {
+	for w := 30; w <= 140; w += 5 {
+		h, _ := stackedHarness(playing(0, 200*time.Second), w, 30, Deps{})
+		h.press("?")
+		h.m.setNote("history not saved")
+		last := h.rows()[29]
+		if lipgloss.Width(last) > w {
+			t.Errorf("w=%d: the bottom row is %d wide", w, lipgloss.Width(last))
+		}
+		if !strings.Contains(last, "Spotify") {
+			t.Errorf("w=%d: the source must stay visible next to help/notes: %q", w, last)
+		}
+		idx := strings.Index(last, "Spotify")
+		noteEnd := lipgloss.Width(strings.TrimRight(last[:idx], " "))
+		if gap := cellX(last, "Spotify") - noteEnd; gap < 2 {
+			t.Errorf("w=%d: only %d cells between the note and the source: %q", w, gap, last)
+		}
+	}
+}
+
+func TestCompactStillGetsHelpButNoSource(t *testing.T) {
+	h, _ := compactHarness(playing(0, 200*time.Second), 50, 9, Deps{})
+	h.press("?")
+	last := h.rows()[8]
+	if !strings.Contains(last, "space play") || strings.Contains(last, "Spotify") {
+		t.Errorf("a free last row shows help, but the compact card has no source: %q", last)
+	}
+}
+
+func TestHelpMentionsTheSourceKey(t *testing.T) {
+	h := newHarness(playing(0, 200*time.Second), Deps{})
+	h.resize(160, 30)
+	h.press("?")
+	if !strings.Contains(h.rows()[29], "s src") {
+		t.Errorf("help should list s: %q", h.rows()[29])
+	}
+}
+
+// At 100 columns the full help and the source name do not fit side by side. The
+// help must never lose its last keys (q quit) to make room for a decoration.
+func TestHelpWinsOverTheSourceNameWhenTheyDoNotFit(t *testing.T) {
+	for _, w := range []int{60, 80, 100, 110} {
+		h, _ := stackedHarness(playing(0, 200*time.Second), w, 30, Deps{})
+		h.press("?")
+		last := h.rows()[29]
+		if w >= 100 && !strings.Contains(last, "q quit") {
+			t.Errorf("w=%d: the help lost its last keys: %q", w, last)
+		}
+		if lipgloss.Width(last) > w {
+			t.Errorf("w=%d: bottom row is %d wide", w, lipgloss.Width(last))
+		}
+		fits := lipgloss.Width(helpText) <= w-lipgloss.Width("Spotify")-5
+		if both := strings.Contains(last, "q quit") && strings.Contains(last, "Spotify"); both != fits {
+			t.Errorf("w=%d: help and source drawn together = %v, but fitting together = %v: %q", w, both, fits, last)
+		}
+		h.press("?")
+		if !strings.Contains(h.rows()[29], "Spotify") {
+			t.Errorf("w=%d: the source comes back when the help closes", w)
+		}
+	}
+	wide, _ := stackedHarness(playing(0, 200*time.Second), 160, 30, Deps{})
+	wide.press("?")
+	if last := wide.rows()[29]; !strings.Contains(last, "q quit") || !strings.Contains(last, "Spotify") {
+		t.Errorf("when there is room, both show: %q", last)
 	}
 }

@@ -58,7 +58,7 @@ func TestStackedLabelTitleAndArtistAreCentred(t *testing.T) {
 		if h.m.layout().mode != stacked {
 			t.Fatalf("%v should stack", sz)
 		}
-		for name, row := range map[string]int{"label": 0, "title": 2, "artist and album": 3} {
+		for name, row := range map[string]int{"title": 0, "artist and album": 1} {
 			if l, r := margins(t, h, g, row); !near(l, r) || l == 0 {
 				t.Errorf("%v: %s has %d empty cells on the left and %d on the right; should be centred", sz, name, l, r)
 			}
@@ -137,7 +137,7 @@ func TestSideBySideTextIsCentredInItsColumn(t *testing.T) {
 		if h.m.layout().mode != sideBySide {
 			t.Fatalf("%v should be side by side", sz)
 		}
-		for name, row := range map[string]int{"source": 0, "title": 2, "artist and album": 3} {
+		for name, row := range map[string]int{"title": 0, "artist and album": 1} {
 			if l, r := margins(t, h, g, row); !near(l, r) || l == 0 {
 				t.Errorf("%v: %s has %d empty cells left and %d right", sz, name, l, r)
 			}
@@ -169,7 +169,7 @@ func TestTextOnlyCardIsCentredLikeTheStackedOne(t *testing.T) {
 		if h.m.layout().mode != textOnly {
 			t.Fatalf("%v: setup should be text only", sz)
 		}
-		for name, row := range map[string]int{"label": 0, "title": 2, "artist and album": 3} {
+		for name, row := range map[string]int{"title": 0, "artist and album": 1} {
 			if l, r := margins(t, h, g, row); !near(l, r) || l == 0 {
 				t.Errorf("%v: %s has %d empty cells left and %d right; should be centred", sz, name, l, r)
 			}
@@ -214,7 +214,7 @@ func TestTextOnlyNarrowPanesStayCentredAndInsideThePane(t *testing.T) {
 				t.Errorf("%v: row %d is %d wide", sz, i, lipgloss.Width(r))
 			}
 		}
-		if l, r := margins(t, h, g, 2); !near(l, r) {
+		if l, r := margins(t, h, g, 0); !near(l, r) {
 			t.Errorf("%v: title margins %d / %d", sz, l, r)
 		}
 	}
@@ -224,10 +224,10 @@ func TestCoverKeyKeepsTheTextCentredInPortrait(t *testing.T) {
 	h := newHarness(playing(0, 200*time.Second), Deps{}).withDemoHistory()
 	h.resize(80, 50) // portrait: stacked
 	_, g1 := h.m.compose()
-	l1, r1 := margins(t, h, g1, 2)
+	l1, r1 := margins(t, h, g1, 0)
 	h.press("a") // hide the cover: text only
 	_, g2 := h.m.compose()
-	l2, r2 := margins(t, h, g2, 2)
+	l2, r2 := margins(t, h, g2, 0)
 	if !near(l1, r1) || !near(l2, r2) || l2 == 0 {
 		t.Errorf("the title stays centred when the cover is hidden: %d/%d then %d/%d", l1, r1, l2, r2)
 	}
@@ -282,7 +282,7 @@ func TestStackedLongTitlesStillFit(t *testing.T) {
 	st.Album = strings.Repeat("Some Album ", 12)
 	h, g := stackedHarness(st, 60, 40, Deps{})
 	rows := h.rows()
-	for name, row := range map[string]int{"title": 2, "artist line": 3} {
+	for name, row := range map[string]int{"title": 0, "artist line": 1} {
 		s, e := span(rows[g.infoY+row])
 		if s < g.infoX || e > g.infoX+g.infoW {
 			t.Errorf("%s spans %d..%d, outside the card %d..%d", name, s, e, g.infoX, g.infoX+g.infoW)
@@ -296,23 +296,33 @@ func TestStackedLongTitlesStillFit(t *testing.T) {
 	}
 }
 
-func TestStackedNoteAndReconnectingAreCentredToo(t *testing.T) {
-	h, g := stackedHarness(playing(0, 200*time.Second), 80, 50, Deps{})
+func TestNotesAndReconnectingSitOnTheBottomRowCentredOrRight(t *testing.T) {
+	h, _ := stackedHarness(playing(0, 200*time.Second), 80, 50, Deps{})
 	h.m.setNote("next failed")
-	if l, r := margins(t, h, g, 0); !near(l, r) || l == 0 {
-		t.Errorf("a note should be centred: %d / %d", l, r)
+	rows := h.rows()
+	last := rows[len(rows)-1]
+	st, en := span(last)
+	if x := cellX(last, "next failed"); x < 0 || !near(x, 80-(x+len("next failed"))+0) && false {
+		t.Errorf("the note should be on the bottom row: %q", last)
 	}
-	st := playing(0, 200*time.Second)
-	st.Status = source.StatusReconnecting
-	h2, g2 := stackedHarness(st, 80, 50, Deps{})
-	if l, r := margins(t, h2, g2, 0); !near(l, r) || l == 0 {
-		t.Errorf("the reconnecting label should be centred: %d / %d", l, r)
+	if mid := cellX(last, "next failed") + len("next failed")/2; !near(mid, 40) {
+		t.Errorf("the note should be centred in the pane, centre at %d", mid)
+	}
+	if !strings.Contains(last, "Spotify") || en != 80-2 || st < 0 {
+		t.Errorf("the source stays in the corner next to a note: %q", last)
+	}
+	st2 := playing(0, 200*time.Second)
+	st2.Status = source.StatusReconnecting
+	h2, _ := stackedHarness(st2, 80, 50, Deps{})
+	r2 := h2.rows()[49]
+	if !strings.Contains(r2, "reconnecting…") || strings.Contains(r2, "Spotify") {
+		t.Errorf("reconnecting takes the corner: %q", r2)
 	}
 }
 
 func TestStackedNothingPlayingIsCentred(t *testing.T) {
 	h, g := stackedHarness(source.State{}, 80, 50, Deps{})
-	for name, row := range map[string]int{"title": 2} { // idle has no source, so the first row is blank
+	for name, row := range map[string]int{"title": 0} { // idle has no source, so the first row is blank
 		if l, r := margins(t, h, g, row); !near(l, r) || l == 0 {
 			t.Errorf("idle %s: %d / %d", name, l, r)
 		}
@@ -373,7 +383,7 @@ func TestResizingAcrossTheStackingBoundaryKeepsTheTextCentred(t *testing.T) {
 	for _, sz := range [][2]int{{80, 20}, {80, 50}, {80, 20}, {60, 30}} {
 		h.resize(sz[0], sz[1])
 		_, g := h.m.compose()
-		if l, r := margins(t, h, g, 2); !near(l, r) || l == 0 {
+		if l, r := margins(t, h, g, 0); !near(l, r) || l == 0 {
 			t.Errorf("%v: the title should be centred: %d / %d", sz, l, r)
 		}
 	}

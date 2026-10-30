@@ -29,7 +29,7 @@ func TestMissingFileGivesDefaults(t *testing.T) {
 
 func TestDefaults(t *testing.T) {
 	want := Config{
-		ShowCover: true, ArtMaxPx: 32, QuantizeColors: 12, Scanlines: true, Icons: "unicode",
+		ShowCover: true, ShowSource: true, ArtMaxPx: 32, QuantizeColors: 12, Scanlines: true, Icons: "unicode",
 		HistorySize: 10, ShowHistory: true, HistoryFade: true, MinPlaySeconds: 10,
 	}
 	if got := Default(); got != want {
@@ -38,20 +38,20 @@ func TestDefaults(t *testing.T) {
 }
 
 func TestNewSwitchesCanBeTurnedOff(t *testing.T) {
-	cfg, warns := Load(write(t, "show_cover = false\nshow_history = false\nhistory_fade = false\n"))
-	if cfg.ShowCover || cfg.ShowHistory || cfg.HistoryFade || len(warns) != 0 {
+	cfg, warns := Load(write(t, "show_cover = false\nshow_history = false\nhistory_fade = false\nshow_source = false\n"))
+	if cfg.ShowCover || cfg.ShowHistory || cfg.HistoryFade || cfg.ShowSource || len(warns) != 0 {
 		t.Errorf("all three should be off with no warnings: %+v %v", cfg, warns)
 	}
 	if cfg.HistorySize != 10 || cfg.QuantizeColors != 12 {
 		t.Errorf("everything else keeps its default: %+v", cfg)
 	}
-	if cfg, _ := Load(write(t, "")); !cfg.ShowCover || !cfg.ShowHistory || !cfg.HistoryFade {
+	if cfg, _ := Load(write(t, "")); !cfg.ShowCover || !cfg.ShowHistory || !cfg.HistoryFade || !cfg.ShowSource {
 		t.Errorf("an empty file leaves them on: %+v", cfg)
 	}
 }
 
 func TestNewSwitchesRejectNonBooleans(t *testing.T) {
-	for _, body := range []string{`show_cover = "no"`, `show_history = 0`, `history_fade = "off"`} {
+	for _, body := range []string{`show_cover = "no"`, `show_history = 0`, `history_fade = "off"`, `show_source = "yes"`} {
 		cfg, warns := Load(write(t, body))
 		if cfg != Default() || len(warns) != 1 || !strings.Contains(warns[0], "config ignored") {
 			t.Errorf("%s: should fall back to defaults with a warning: %+v %v", body, cfg, warns)
@@ -88,13 +88,14 @@ accent           = "#c9a7ff"
 icons            = "nerd"
 history_size     = 100
 show_cover       = false
+show_source      = false
 show_history     = false
 history_fade     = false
 min_play_seconds = 0
 background       = "#3b3d4e"
 `))
 	want := Config{
-		ShowCover: false, ArtMaxPx: 24, QuantizeColors: 0, Scanlines: false, Accent: "#c9a7ff", Icons: "nerd",
+		ShowCover: false, ShowSource: false, ArtMaxPx: 24, QuantizeColors: 0, Scanlines: false, Accent: "#c9a7ff", Icons: "nerd",
 		HistorySize: 100, ShowHistory: false, HistoryFade: false, MinPlaySeconds: 0, Background: "#3b3d4e",
 	}
 	if cfg != want || len(warns) != 0 {

@@ -202,7 +202,7 @@ func TestPortraitStackIsActuallyDrawnStacked(t *testing.T) {
 			if strings.ContainsAny(r, "▀▄") {
 				lastCover = i
 			}
-			if label < 0 && strings.Contains(r, "Spotify") {
+			if label < 0 && strings.Contains(r, "Low Orbit") {
 				label = i
 			}
 		}
@@ -392,11 +392,11 @@ func TestHidingHistoryRecentresTheInfoColumnAgainstTheCover(t *testing.T) {
 			}
 			coverBottom = i
 		}
-		if label < 0 && strings.Contains(r, "Spotify") {
+		if label < 0 && strings.Contains(r, "Low Orbit") {
 			label = i
 		}
 	}
-	infoRows := 8 // label … transport, no history block
+	infoRows := 6 // title … transport, no history block
 	coverRows := coverBottom - coverTop + 1
 	if want := coverTop + (coverRows-infoRows)/2; label != want {
 		t.Errorf("info should start at row %d to centre on the cover (rows %d..%d), got %d", want, coverTop, coverBottom, label)
@@ -423,7 +423,7 @@ func TestHelpMentionsTheHistoryKey(t *testing.T) {
 	h.resize(120, 30)
 	h.press("?")
 	rows := h.rows()
-	if got := rows[len(rows)-1]; !strings.Contains(got, "r history") || !strings.Contains(got, "q quit") {
+	if got := rows[len(rows)-1]; !strings.Contains(got, "r hist") || !strings.Contains(got, "q quit") {
 		t.Errorf("help should list the new key: %q", got)
 	}
 }
@@ -645,7 +645,7 @@ func TestHelpMentionsTheCoverKey(t *testing.T) {
 	h.resize(120, 30)
 	h.press("?")
 	rows := h.rows()
-	if got := rows[len(rows)-1]; !strings.Contains(got, "a art") || !strings.Contains(got, "r history") || !strings.Contains(got, "q quit") {
+	if got := rows[len(rows)-1]; !strings.Contains(got, "a art") || !strings.Contains(got, "r hist") || !strings.Contains(got, "q quit") {
 		t.Errorf("help should list the cover key: %q", got)
 	}
 }

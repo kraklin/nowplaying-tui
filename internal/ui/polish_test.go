@@ -196,16 +196,15 @@ func TestClicksElsewhereDoNothing(t *testing.T) {
 	lastHitEnd := hitsRow[len(hitsRow)-1].x1
 	px, py := h.find(h.m.icons.prev)
 	for name, pos := range map[string][2]int{
-		"title":              {g.infoX + 2, g.infoY + 2},
-		"artist":             {g.infoX + 2, g.infoY + 3},
-		"label":              {g.infoX + 2, g.infoY},
+		"title":              {g.infoX + 2, g.infoY},
+		"artist":             {g.infoX + 2, g.infoY + 1},
 		"past the last icon": {g.infoX + lastHitEnd + 1, py},
 		"between icons":      {px + 2, py},
 		"cover":              {2, g.infoY + 3},
 		"left of the pane":   {0, 0},
 		"below everything":   {g.infoX + 3, 19},
 		"time text":          {g.infoX + g.infoW - 3, g.infoY + rowProgress},
-		"blank row":          {g.infoX + 3, g.infoY + 4},
+		"blank row":          {g.infoX + 3, g.infoY + 2},
 		"far outside":        {500, 500},
 		"negative":           {-1, -1},
 	} {
@@ -349,12 +348,12 @@ func TestHelpLineToggles(t *testing.T) {
 	h := newHarness(playing(0, 200*time.Second), Deps{})
 	h.resize(140, 24)
 	before := h.rows()
-	if strings.Contains(strings.Join(before, "\n"), "space play/pause") {
+	if strings.Contains(strings.Join(before, "\n"), "space play") {
 		t.Fatal("help starts hidden")
 	}
 	h.press("?")
 	after := h.rows()
-	if !strings.Contains(after[len(after)-1], "space play/pause") || !strings.Contains(after[len(after)-1], "q quit") {
+	if !strings.Contains(after[len(after)-1], "space play") || !strings.Contains(after[len(after)-1], "q quit") {
 		t.Errorf("help should fill the bottom row, got %q", after[len(after)-1])
 	}
 	for i := 0; i < len(after)-1; i++ {
@@ -362,11 +361,13 @@ func TestHelpLineToggles(t *testing.T) {
 			t.Errorf("the help line must not move the card (row %d changed)", i)
 		}
 	}
-	if st, en := span(after[len(after)-1]); st < 5 || !near(st, 140-en) {
+	last := after[len(after)-1]
+	st, en := cellX(last, "space"), cellX(last, "q quit")+len("q quit") // the source sits in the corner, apart from it
+	if st < 5 || !near(st, 140-en) {
 		t.Errorf("help should be centred in the pane: %d empty cells left, %d right", st, 140-en)
 	}
 	h.press("?")
-	if strings.Contains(h.m.View(), "space play/pause") {
+	if strings.Contains(h.m.View(), "space play") {
 		t.Errorf("a second ? hides it")
 	}
 }
@@ -387,7 +388,7 @@ func TestHelpDoesNotCoverTheCardInShortPanes(t *testing.T) {
 	h := newHarness(playing(0, 200*time.Second), Deps{})
 	h.resize(80, 10)
 	h.press("?")
-	if !strings.Contains(h.m.View(), "Spotify") || !strings.Contains(h.m.View(), "Low Orbit") {
+	if !strings.Contains(h.m.View(), "space play") || !strings.Contains(h.m.View(), "Low Orbit") {
 		t.Errorf("the card must stay visible:\n%s", h.m.View())
 	}
 }
@@ -611,7 +612,8 @@ func TestBrokenDefaultsNeverPanic(t *testing.T) {
 
 func blockRows(rows []string) (first, last int) {
 	first, last = -1, -1
-	for i, r := range rows {
+	// The last row belongs to the corner (source) and the help line, not the card.
+	for i, r := range rows[:max(len(rows)-1, 0)] {
 		if strings.TrimSpace(r) != "" {
 			if first < 0 {
 				first = i
@@ -634,7 +636,7 @@ func TestStackedLayoutRules(t *testing.T) {
 			if strings.ContainsAny(r, "▀▄") {
 				lastCover = i
 			}
-			if label < 0 && strings.Contains(r, "Spotify") {
+			if label < 0 && strings.Contains(r, "Low Orbit") {
 				label = i
 			}
 		}
@@ -675,7 +677,7 @@ func TestSideBySideLayoutRules(t *testing.T) {
 				}
 				lastCover = i
 			}
-			if label < 0 && strings.Contains(r, "Spotify") {
+			if label < 0 && strings.Contains(r, "Low Orbit") {
 				label = i
 			}
 		}

@@ -52,6 +52,7 @@ external tools, so it works on Linux too.
 | `+` / `-` | System volume +5 / −5 (also unmutes) |
 | `m` | Mute / unmute the system volume; the bar shows `mute` while muted |
 | `a` | Show / hide the cover art (the text-only card; the accent colour stays) |
+| `s` | Show / hide the name of the source (Spotify, Firefox, …) in the bottom right corner |
 | `r` | Show or hide the recently played list |
 | `c` | Clear the recently played list (press `c` again to confirm) |
 | `?` | Show or hide the key help line |
@@ -99,16 +100,20 @@ Side margins grow with the pane so wide terminals keep breathing room. The info
 column is at least 36 and at most 64 cells wide. Long titles are cut with `…`,
 never wrapped.
 
-The first row is the name of the source (Spotify, Firefox, …), and it is blank
-when nothing is playing. The source name, title, artist line and control icons
-are always centred; the progress bar and the history list keep the full width. The
-volume bar stays at the right edge of the controls row, and in a narrow card the
-icons move left just far enough to keep two cells clear of it.
+The title, artist line and control icons are always centred; the progress bar and the
+history list keep the full width. The volume bar stays at the right edge of the
+controls row, and in a narrow card the icons move left just far enough to keep two
+cells clear of it.
+
+The name of the source (Spotify, Firefox, …) sits in the bottom right corner of the
+pane, and is not shown when nothing is playing. Notes (like `next failed`) and the key
+help (`?`) share that bottom row, centred; they slide left rather than touch the name, and if the help cannot fit beside it
+the name steps aside until the help is closed.
 
 ### Compact card
 
 In a really small pane (under 10 rows or under 30 columns) everything that is not
-essential goes: no cover, no source row, no progress bar, no volume, no history. What
+essential goes: no cover, no source name, no progress bar, no volume, no history. What
 is left is the title, the artist and one row with the controls and the time:
 
 ![the compact card for very small panes](docs/compact.svg)
@@ -131,6 +136,7 @@ nowplaying reads `$XDG_CONFIG_HOME/nowplaying/config.toml`, or
 
 ```toml
 show_cover       = true      # false hides the cover: text only
+show_source      = true      # false hides the player name (bottom right; s toggles it)
 art_max_px       = 32        # cover size cap in pixels (8-128)
 quantize_colors  = 12        # flat, stylised palette; 0 = off (0-64)
 scanlines        = true      # darken every other pixel row by ~12%
@@ -149,6 +155,10 @@ A bad config never stops nowplaying. Invalid values fall back to their default, 
 file that cannot be parsed is ignored, and a short warning appears on the first
 line for a few seconds.
 
+- **Keys and config:** every view toggle has a matching setting that decides its
+  starting state: `a` ↔ `show_cover`, `r` ↔ `show_history`, `s` ↔ `show_source`.
+  `?` (help) always starts hidden, `m` (mute) is the live system state, and `c` clears
+  the history, so none of those are settings.
 - **`show_cover`:** `false` shows only the text (`a` toggles the cover while running;
   this key only sets the starting state). The accent colour still follows the
   artwork: nowplaying decodes a small copy of the cover just to pick it, and the pick

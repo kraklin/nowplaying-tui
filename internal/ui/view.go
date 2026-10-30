@@ -14,11 +14,11 @@ const (
 	maxInfoW   = 64
 	marginY    = 2
 	minInfoW   = 36
-	infoLines  = 10 // label … "recently played" header, without history rows
+	infoLines  = 8 // title … "recently played" header, without history rows
 
 	// Rows inside the info block; the mouse handler relies on them.
-	rowProgress  = 5
-	rowTransport = 7
+	rowProgress  = 3
+	rowTransport = 5
 
 	// Below this the card drops to its compact form: title, artist, controls + time.
 	compactBelowRows = 10
@@ -27,7 +27,7 @@ const (
 	volTrackW = 10 // cells in the volume bar, after the icon and a space
 	iconGap   = "   "
 
-	helpText = "space play/pause · n/p skip · ←/→ seek · +/- vol · m mute · a art · r history · c clear · q quit"
+	helpText = "space play · n/p skip · ←/→ seek · +/- vol · m mute · a art · s src · r hist · c clear · q quit"
 )
 
 type layoutMode int
@@ -172,15 +172,72 @@ func (m Model) compose() ([]string, geom) {
 		}
 		rows[r] = paint(segs)
 	}
-	if m.help && m.h > 0 && rows[m.h-1] == "" {
-		text := fit(helpText, min(m.w-2, lipgloss.Width(helpText)))
-		rows[m.h-1] = paint([]segment{{max((m.w-lipgloss.Width(text))/2, 0), m.th.dim2.Render(strings.TrimRight(text, " "))}})
+	if m.h > 0 && rows[m.h-1] == "" {
+		rows[m.h-1] = m.bottomRow()
 	}
 	g := geom{infoX: infoX, infoY: infoY, infoW: l.infoW, progRow: rowProgress, ctrlRow: rowTransport}
 	if l.compact {
 		g.progRow, g.ctrlRow = -1, len(info)-1
 	}
 	return rows, g
+}
+
+// sourceTag is the name of the player for the bottom right corner: Spotify,
+// Firefox… It is hidden by show_source / the s key, and when nothing is playing.
+// "reconnecting…" is shown regardless, because it matters.
+func (m Model) sourceTag() string {
+	s := m.state
+	if s.Status == source.StatusReconnecting {
+		return "reconnecting…"
+	}
+	if !m.showSource || s.Empty() {
+		return ""
+	}
+	return appName(s.App)
+}
+
+// bottomRow is the pane's last row, which the card leaves blank: the source name
+// sits in the right corner, and a note or the key help is centred. The centred
+// text stays centred while it fits clear of the source; if it would touch it, it
+// slides left just far enough (and is cut only if it still does not fit).
+func (m Model) bottomRow() string {
+	src := m.sourceTag()
+	if m.layout().compact {
+		src = "" // the compact card has no source; help and notes still use a free row
+	}
+	// The key help is something you asked for: if it cannot fit beside the source
+	// name, the name steps aside until the help is closed.
+	if m.help && m.note == "" && src != "" && lipgloss.Width(helpText) > m.w-lipgloss.Width(src)-2-2-1 {
+		src = ""
+	}
+	srcW := lipgloss.Width(src)
+	limit := m.w - 1 // the centred text must end before this column
+	if src != "" {
+		limit = m.w - srcW - 2 - 2 // two cells clear of the source
+	}
+	var segs []segment
+	centre, style, tail := "", m.th.dim2, ""
+	switch {
+	case m.note != "":
+		centre, style, tail = m.note, m.th.dim, m.noteTail
+	case m.help:
+		centre = helpText
+	}
+	if avail := limit - 1; centre != "" && avail >= 1 {
+		head := strings.TrimRight(fit(centre, min(avail-lipgloss.Width(tail), lipgloss.Width(centre))), " ")
+		if text := head + tail; strings.TrimSpace(text) != "" {
+			cw := lipgloss.Width(text)
+			x := (m.w - cw) / 2
+			if x+cw > limit {
+				x = max(limit-cw, 1)
+			}
+			segs = append(segs, segment{x, style.Render(text)})
+		}
+	}
+	if src != "" && m.w >= srcW+2 {
+		segs = append(segs, segment{m.w - srcW - 2, m.th.dim2.Render(src)})
+	}
+	return paint(segs)
 }
 
 type segment struct {
@@ -248,24 +305,6 @@ func (m Model) info(l layout, accentHex string) string {
 	// Text is always centred; the bar and the history keep the full width.
 	align := func(x string) string { return centerIn(x, w) }
 
-	// First row: the name of the source (Spotify, Firefox…), or nothing. A note
-	// (error, confirmation) takes its place. It must stay one row: the mouse rows
-	// depend on it.
-	tag := appName(s.App)
-	if s.Status == source.StatusReconnecting {
-		tag = "reconnecting…"
-	} else if s.Empty() {
-		tag = ""
-	}
-	labelRow := ""
-	if tag != "" {
-		labelRow = m.th.dim.Render(strings.TrimRight(fit(tag, w), " "))
-	}
-	if m.note != "" {
-		tail := m.noteTail
-		head := strings.TrimRight(fit(m.note, max(w-lipgloss.Width(tail), 1)), " ")
-		labelRow = m.th.dim.Render(head + tail)
-	}
 	title, sub := "nothing playing", ""
 	if !s.Empty() {
 		title = s.Title
@@ -280,7 +319,6 @@ func (m Model) info(l layout, accentHex string) string {
 	transport, _, _ := m.transportRow(ac, w)
 
 	lines := []string{
-		line(align(labelRow)), "",
 		line(align(ac.Render(strings.TrimRight(fit(title, w), " ")))),
 		line(align(m.truncStyled(sub, s.Artist+" · "+s.Album, w))), "",
 		line(progress), "",

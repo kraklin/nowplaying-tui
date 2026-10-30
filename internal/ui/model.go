@@ -129,6 +129,7 @@ type Model struct {
 	help         bool
 	showHistory  bool
 	showCover    bool
+	showSource   bool
 	tracker      *history.Tracker
 	histMax      int
 	histSeq      uint64
@@ -147,6 +148,7 @@ func New(states <-chan source.State, recent []history.Entry, bg color.RGBA, deps
 		cfg:         cfg,
 		showHistory: cfg.ShowHistory,
 		showCover:   cfg.ShowCover,
+		showSource:  cfg.ShowSource,
 		tracker:     history.NewTracker(time.Duration(cfg.MinPlaySeconds) * time.Second),
 		histMax:     cfg.HistorySize,
 		src:         states,
@@ -342,6 +344,9 @@ func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		m.showHistory = !m.showHistory
 		return m, m.ensureArt()
+	case "s":
+		m.showSource = !m.showSource
+		return m, nil
 	case "a":
 		m.showCover = !m.showCover
 		return m, m.ensureArt()

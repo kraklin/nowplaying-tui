@@ -24,6 +24,8 @@ type Config struct {
 	Accent         string `toml:"accent"`
 	Icons          string `toml:"icons"`
 	HistorySize    int    `toml:"history_size"`
+	// ShowSource false hides the name of the player (bottom right corner).
+	ShowSource bool `toml:"show_source"`
 	// ShowHistory false hides the recently played list at start (r toggles it).
 	ShowHistory bool `toml:"show_history"`
 	// HistoryFade false draws every history row at full strength.
@@ -37,6 +39,7 @@ type Config struct {
 func Default() Config {
 	return Config{
 		ShowCover:      true,
+		ShowSource:     true,
 		ShowHistory:    true,
 		HistoryFade:    true,
 		ArtMaxPx:       32,
