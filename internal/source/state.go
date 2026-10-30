@@ -2,6 +2,15 @@ package source
 
 import "time"
 
+// Status says whether the source itself is healthy.
+type Status int
+
+const (
+	StatusOK Status = iota
+	StatusReconnecting
+	StatusMissing // media-control is not installed
+)
+
 // State is the full now-playing snapshot. A zero Title means nothing is playing.
 type State struct {
 	Title     string
@@ -14,6 +23,7 @@ type State struct {
 	Playing   bool
 	App       string
 	Art       []byte
+	Status    Status
 }
 
 // Empty reports whether nothing is playing.
