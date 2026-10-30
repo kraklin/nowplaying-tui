@@ -33,6 +33,9 @@ type volSetMsg struct {
 	err  error
 }
 
+// HistorySavedMsg is the result of writing the history file.
+type HistorySavedMsg struct{ Err error }
+
 // ControlErrMsg reports a failed transport command.
 type ControlErrMsg struct {
 	Op  string
@@ -64,8 +67,10 @@ const (
 	seekChain = 800 * time.Millisecond
 	// After a volume key, polled values are ignored for volHold so the bar
 	// does not jump back.
-	volHold = 1500 * time.Millisecond
-	noteFor = 3 * time.Second
+	volHold     = 1500 * time.Millisecond
+	noteFor     = 3 * time.Second
+	confirmNote = "clear history? press c again"
+	confirmFor  = 5 * time.Second
 )
 
 // Volume is the system volume. Calls are slow and must run inside a tea.Cmd.
@@ -74,10 +79,14 @@ type Volume interface {
 	Set(int) error
 }
 
-// Deps are the side-effecting collaborators; either may be nil.
+// Deps are the side-effecting collaborators; all are optional.
 type Deps struct {
 	Control func(source.Cmd) error
 	Volume  Volume
+	History *history.Store // nil keeps the history in memory only
+	// MinPlay and HistorySize default to history.DefaultMinPlay and DefaultSize.
+	MinPlay     time.Duration
+	HistorySize int
 }
 
 type Model struct {
@@ -101,11 +110,22 @@ type Model struct {
 	seekTo    time.Duration
 	note      string
 	noteUntil time.Time
+
+	tracker      *history.Tracker
+	histMax      int
+	histSeq      uint64
+	confirmUntil time.Time
 }
 
 // New builds the model; bg is the terminal background colour.
 func New(states <-chan source.State, recent []history.Entry, bg color.RGBA, deps Deps) Model {
+	histMax := deps.HistorySize
+	if histMax <= 0 {
+		histMax = history.DefaultSize
+	}
 	return Model{
+		tracker: history.NewTracker(deps.MinPlay),
+		histMax: histMax,
 		src:     states,
 		deps:    deps,
 		clock:   time.Now,
@@ -190,7 +210,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case StateMsg:
 		m.state = source.State(msg)
 		m.now = m.clock()
-		return m, tea.Batch(waitState(m.src), m.ensureArt())
+		cmds := []tea.Cmd{waitState(m.src), m.ensureArt()}
+		if e := m.tracker.Observe(m.state, m.now); e != nil {
+			m.recent = history.Push(m.recent, *e, m.histMax)
+			cmds = append(cmds, m.saveHistory())
+		}
+		return m, tea.Batch(cmds...)
+	case HistorySavedMsg:
+		if msg.Err != nil {
+			m.setNote("history not saved")
+		}
+		return m, nil
 	case ArtMsg:
 		key := artKey{msg.Hash, msg.Px}
 		delete(m.pending, key)
@@ -236,13 +266,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) setNote(s string) {
+func (m *Model) setNote(s string) { m.setNoteFor(s, noteFor) }
+
+func (m *Model) setNoteFor(s string, d time.Duration) {
 	m.note = s
-	m.noteUntil = m.clock().Add(noteFor)
+	m.noteUntil = m.clock().Add(d)
+}
+
+// saveHistory writes a snapshot of the list off the UI loop. The sequence
+// number lets the store drop a save that finishes after a newer one.
+func (m *Model) saveHistory() tea.Cmd {
+	store := m.deps.History
+	if store == nil {
+		return nil
+	}
+	m.histSeq++
+	seq, snap := m.histSeq, append([]history.Entry(nil), m.recent...)
+	return func() tea.Msg { return HistorySavedMsg{Err: store.Save(seq, snap)} }
 }
 
 func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Clearing needs a second "c"; any other key, or waiting, cancels it.
+	armed := !m.confirmUntil.IsZero() && m.clock().Before(m.confirmUntil)
+	m.confirmUntil = time.Time{}
+	if msg.String() != "c" && m.note == confirmNote {
+		m.note = ""
+	}
 	switch msg.String() {
+	case "c":
+		if armed {
+			m.recent, m.note = nil, ""
+			return m, m.saveHistory()
+		}
+		if len(m.recent) > 0 {
+			m.confirmUntil = m.clock().Add(confirmFor)
+			m.setNoteFor(confirmNote, confirmFor)
+		}
+		return m, nil
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	case " ":

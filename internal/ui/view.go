@@ -92,12 +92,13 @@ func (m Model) info(l layout, accentHex string) string {
 	s := m.state
 	line := func(x string) string { return lipgloss.NewStyle().Width(w).Render(x) }
 
-	label := "♫  now playing"
+	// A note (error, confirmation) takes over the label row; it must stay one row.
+	labelRow := m.th.dim.Render("♫  now playing")
 	if app := appName(s.App); app != "" && !s.Empty() {
-		label += "  " + m.th.dim2.Render(app)
+		labelRow += "  " + m.th.dim2.Render(app)
 	}
 	if m.note != "" {
-		label += "  " + m.th.dim.Render("· "+m.note)
+		labelRow = m.th.dim.Render(strings.TrimRight(fit("♫  "+m.note, w), " "))
 	}
 	title, sub := "nothing playing", ""
 	if !s.Empty() {
@@ -112,7 +113,7 @@ func (m Model) info(l layout, accentHex string) string {
 	progress := m.progress(ac, w, elapsed)
 
 	lines := []string{
-		m.th.dim.Render(label), "",
+		labelRow, "",
 		line(ac.Render(fit(title, w))),
 		line(m.truncStyled(sub, s.Artist+" · "+s.Album, w)), "",
 		line(progress), "",

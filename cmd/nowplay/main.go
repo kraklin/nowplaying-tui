@@ -44,13 +44,22 @@ func main() {
 			fmt.Fprintln(os.Stderr, "nowplay needs media-control:\n  brew tap ungive/media-control && brew install media-control")
 			os.Exit(1)
 		}
-		src, recent = mc, nil
+		src, recent = mc, nil // recent is loaded from disk below
 	}
 	deps := ui.Deps{Control: src.Control}
 	if *demo {
 		deps.Volume = volume.NewFake(55)
-	} else if volume.Available() {
-		deps.Volume = volume.New()
+	} else {
+		if volume.Available() {
+			deps.Volume = volume.New()
+		}
+		if path, err := history.DefaultPath(); err == nil {
+			deps.History = history.NewStore(path, history.DefaultSize)
+			var lerr error
+			if recent, lerr = deps.History.Load(); lerr != nil {
+				fmt.Fprintln(os.Stderr, "nowplay:", lerr)
+			}
+		}
 	}
 
 	states := make(chan source.State, 1)
