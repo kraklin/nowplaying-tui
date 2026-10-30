@@ -29,7 +29,10 @@ type artKey struct {
 	px   int
 }
 
-const placeholderHash = "placeholder"
+const (
+	placeholderHash = "placeholder"
+	maxCached       = 64
+)
 
 type Model struct {
 	src     <-chan source.State
@@ -41,7 +44,7 @@ type Model struct {
 	cache   map[artKey]art.Result
 	pending map[artKey]bool
 	icons   icons
-	dark    bool
+	opts    art.Options
 }
 
 func New(states <-chan source.State, recent []history.Entry) Model {
@@ -53,7 +56,7 @@ func New(states <-chan source.State, recent []history.Entry) Model {
 		cache:   map[artKey]art.Result{},
 		pending: map[artKey]bool{},
 		icons:   unicodeIcons,
-		dark:    lipgloss.HasDarkBackground(),
+		opts:    art.DefaultOptions(lipgloss.HasDarkBackground()),
 	}
 }
 
@@ -63,12 +66,12 @@ func waitState(ch <-chan source.State) tea.Cmd {
 	return func() tea.Msg { return StateMsg(<-ch) }
 }
 
-func renderArt(key artKey, data []byte, dark bool) tea.Cmd {
+func renderArt(key artKey, data []byte, opts art.Options) tea.Cmd {
 	return func() tea.Msg {
 		var res art.Result
 		if key.hash == placeholderHash {
 			res = art.Placeholder(key.px)
-		} else if r, err := art.Build(data, key.px, dark); err == nil {
+		} else if r, err := art.Build(data, key.px, opts); err == nil {
 			res = r
 		} else {
 			res = art.Placeholder(key.px)
@@ -99,7 +102,7 @@ func (m *Model) ensureArt() tea.Cmd {
 		return nil
 	}
 	m.pending[key] = true
-	return renderArt(key, m.state.Art, m.dark)
+	return renderArt(key, m.state.Art, m.opts)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -114,6 +117,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ArtMsg:
 		key := artKey{msg.Hash, msg.Px}
 		delete(m.pending, key)
+		if len(m.cache) >= maxCached {
+			m.cache = map[artKey]art.Result{} // drag-resizing makes many sizes; start over
+		}
 		m.cache[key] = msg.Result
 		return m, nil
 	case tea.KeyMsg:

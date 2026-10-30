@@ -116,3 +116,44 @@ func TestFadedStyleBlend(t *testing.T) {
 		t.Errorf("f=0.5 midpoint wrong, got %v", got)
 	}
 }
+
+func TestArtCacheBySize(t *testing.T) {
+	m := settle(t, 80, 20, false)
+	key80, _ := m.wantArt()
+	if _, ok := m.cache[key80]; !ok {
+		t.Fatal("cover for 80x20 should be cached after settling")
+	}
+	if cmd := m.ensureArt(); cmd != nil {
+		t.Errorf("cached (hash, size) must not trigger another render")
+	}
+
+	var tm tea.Model
+	tm, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	if cmd == nil {
+		t.Fatal("a new cover size must trigger a render")
+	}
+	am, ok := cmd().(ArtMsg)
+	if !ok || am.Px == key80.px {
+		t.Fatalf("expected an ArtMsg for a different size, got %#v", cmd())
+	}
+	tm, _ = tm.Update(am)
+
+	tm, cmd = tm.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	if cmd != nil {
+		t.Errorf("resizing back to a cached size must be instant, got a render command")
+	}
+	if _, ok := tm.(Model).cache[key80]; !ok {
+		t.Errorf("earlier size should still be cached")
+	}
+}
+
+func TestArtCacheIsBounded(t *testing.T) {
+	m := settle(t, 80, 20, false)
+	var tm tea.Model = m
+	for i := 0; i < 3*maxCached; i++ {
+		tm, _ = tm.Update(ArtMsg{Hash: "h", Px: i + 100})
+	}
+	if n := len(tm.(Model).cache); n > maxCached {
+		t.Errorf("cache grew to %d entries", n)
+	}
+}

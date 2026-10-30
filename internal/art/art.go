@@ -30,14 +30,27 @@ func Hash(data []byte) string {
 	return hex.EncodeToString(sum[:8])
 }
 
-// Build decodes data, centre-crops, downscales to px×px and renders it.
-func Build(data []byte, px int, dark bool) (Result, error) {
+// Options controls the pixel-art look.
+type Options struct {
+	Quantize  int  // k-means palette size, 0 = off
+	Scanlines bool // darken every other pixel row
+	Dark      bool // terminal has a dark background (accent contrast target)
+}
+
+func DefaultOptions(dark bool) Options { return Options{Quantize: 12, Scanlines: true, Dark: dark} }
+
+// Build decodes data, centre-crops, downscales to px×px, restyles and renders it.
+func Build(data []byte, px int, o Options) (Result, error) {
 	src, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return Result{}, err
 	}
 	small := resize(cropSquare(src), px)
-	ac := hexColor(ensureContrast(accent(small), dark))
+	ac := hexColor(ensureContrast(pickAccent(small), o.Dark))
+	quantize(small, o.Quantize)
+	if o.Scanlines {
+		scanlines(small)
+	}
 	roundCorners(small)
 	return Result{Rendered: render(small, nil), Accent: ac}, nil
 }
@@ -139,24 +152,6 @@ func overlay(g func(col, row int) (rune, bool), col, row int) (rune, bool) {
 		return 0, false
 	}
 	return g(col, row)
-}
-
-// accent is a stand-in until milestone 3: the most saturated, mid-lightness pixel.
-func accent(img *image.RGBA) color.RGBA {
-	best, bestScore := color.RGBA{201, 167, 255, 255}, -1.0
-	b := img.Bounds()
-	for y := b.Min.Y; y < b.Max.Y; y++ {
-		for x := b.Min.X; x < b.Max.X; x++ {
-			c := img.RGBAAt(x, y)
-			mx := float64(max(c.R, c.G, c.B)) / 255
-			mn := float64(min(c.R, c.G, c.B)) / 255
-			score := (mx - mn) * (1 - math.Abs(mx+mn-1))
-			if score > bestScore {
-				best, bestScore = c, score
-			}
-		}
-	}
-	return best
 }
 
 func hexColor(c color.RGBA) string { return fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B) }

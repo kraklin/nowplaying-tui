@@ -174,7 +174,7 @@ func (m Model) historyRows(n, w int) []string {
 	titleW := rem * 11 / 20
 	artistW := rem - titleW
 	bg, bright, soft := [3]uint8{18, 18, 18}, [3]uint8{216, 216, 216}, [3]uint8{138, 138, 138}
-	if !m.dark {
+	if !m.opts.Dark {
 		bg, bright, soft = [3]uint8{255, 255, 255}, [3]uint8{34, 34, 34}, [3]uint8{107, 107, 107}
 	}
 	for i, e := range m.recent[:n] {
