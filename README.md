@@ -98,10 +98,11 @@ Side margins grow with the pane so wide terminals keep breathing room. The info
 column is at least 36 and at most 64 cells wide. Long titles are cut with `…`,
 never wrapped.
 
-When the card is stacked, the label, title, artist line and control icons are
-centred under the cover; the progress bar and the history list keep the full width.
-The volume bar stays at the right edge of the controls row, and in a narrow stacked
-card the icons move left just far enough to keep two cells clear of it.
+Whenever the text is not beside the cover (stacked, or no cover), the label, title,
+artist line and control icons are centred; the progress bar and the history list
+keep the full width. Beside the cover the text stays left-aligned. The volume bar
+stays at the right edge of the controls row, and in a narrow card the icons move
+left just far enough to keep two cells clear of it.
 
 ![the stacked layout used in narrow and portrait panes](docs/stacked.svg)
 

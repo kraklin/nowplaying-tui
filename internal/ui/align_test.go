@@ -130,34 +130,115 @@ func TestStackedIconsNeverCrowdTheVolumeBar(t *testing.T) {
 	}
 }
 
-func TestOtherLayoutsStayLeftAligned(t *testing.T) {
-	cases := map[string]struct {
-		w, h int
-		cfg  *config.Config
-	}{
-		"side by side": {80, 20, nil},
-		"text only":    {100, 30, cfgWith(func(c *config.Config) { c.ShowCover = false })},
-		"tiny pane":    {36, 14, nil},
+// Left alignment is only for text that sits beside the cover.
+func TestSideBySideStaysLeftAligned(t *testing.T) {
+	h := newHarness(playing(0, 200*time.Second), Deps{}).withDemoHistory()
+	h.resize(80, 20)
+	if h.m.layout().mode != sideBySide {
+		t.Fatal("setup should be side by side")
 	}
-	for name, tc := range cases {
-		h := newHarness(playing(0, 200*time.Second), Deps{Config: tc.cfg}).withDemoHistory()
-		h.resize(tc.w, tc.h)
-		if h.m.layout().mode == stacked {
-			t.Fatalf("%s: setup should not be stacked", name)
+	_, g := h.m.compose()
+	rows := h.rows()
+	if x := cellX(rows[g.infoY+2], "Low Orbit"); x != g.infoX {
+		t.Errorf("the title starts at %d, want the left edge %d", x, g.infoX)
+	}
+	if x := cellX(rows[g.infoY+rowTransport], h.m.icons.prev); x != g.infoX {
+		t.Errorf("icons start at %d, want the left edge %d", x, g.infoX)
+	}
+}
+
+func textOnlyHarness(w, hgt int, st source.State, deps Deps) (*harness, geom) {
+	cfg := cfgWith(func(c *config.Config) { c.ShowCover = false })
+	deps.Config = cfg
+	h := newHarness(st, deps).withDemoHistory()
+	h.send(VolumeMsg{Level: 55})
+	h.resize(w, hgt)
+	_, g := h.m.compose()
+	return h, g
+}
+
+func TestTextOnlyCardIsCentredLikeTheStackedOne(t *testing.T) {
+	for _, sz := range [][2]int{{100, 30}, {80, 20}, {120, 40}, {60, 24}, {200, 50}} {
+		h, g := textOnlyHarness(sz[0], sz[1], playing(0, 200*time.Second), Deps{Volume: &fakeVol{}})
+		if h.m.layout().mode != textOnly {
+			t.Fatalf("%v: setup should be text only", sz)
 		}
-		_, g := h.m.compose()
-		rows := h.rows()
-		for label, tr := range map[string]struct {
-			row  int
-			text string
-		}{"title": {2, "Low Orbit"}, "label": {0, "now playing"}} {
-			if x := cellX(rows[g.infoY+tr.row], tr.text); label == "title" && x != g.infoX {
-				t.Errorf("%s: the title starts at %d, want the left edge %d", name, x, g.infoX)
+		for name, row := range map[string]int{"label": 0, "title": 2, "artist and album": 3} {
+			if l, r := margins(t, h, g, row); !near(l, r) || l == 0 {
+				t.Errorf("%v: %s has %d empty cells left and %d right; should be centred", sz, name, l, r)
 			}
 		}
-		if x := cellX(rows[g.infoY+rowTransport], h.m.icons.prev); x != g.infoX {
-			t.Errorf("%s: icons start at %d, want the left edge %d", name, x, g.infoX)
+		if g.infoW >= centringNeedsAtLeast {
+			ic := h.m.icons
+			row := h.rows()[g.infoY+rowTransport]
+			first, last := cellX(row, ic.prev), cellX(row, ic.next)+lipgloss.Width(ic.next)
+			if mid, want := (first+last)/2, g.infoX+g.infoW/2; !near(mid, want) {
+				t.Errorf("%v: icons centred on %d, card centre %d", sz, mid, want)
+			}
 		}
+	}
+}
+
+func TestTextOnlyKeepsBarAndHistoryAtFullWidth(t *testing.T) {
+	h, g := textOnlyHarness(100, 30, playing(0, 200*time.Second), Deps{})
+	rows := h.rows()
+	if x := cellX(rows[g.infoY+rowProgress], "●"); x != g.infoX {
+		t.Errorf("the bar starts at the card's left edge: %d vs %d", x, g.infoX)
+	}
+	if _, e := span(rows[g.infoY+rowProgress]); e != g.infoX+g.infoW {
+		t.Errorf("and the time ends at the right edge: %d vs %d", e, g.infoX+g.infoW)
+	}
+	for i, r := range rows {
+		if strings.Contains(r, "recently played") {
+			if x := cellX(r, "recently"); x != g.infoX {
+				t.Errorf("history header aligned with its table: %d vs %d", x, g.infoX)
+			}
+			return
+		}
+		_ = i
+	}
+	t.Error("history missing")
+}
+
+func TestTextOnlyNarrowPanesStayCentredAndInsideThePane(t *testing.T) {
+	for _, sz := range [][2]int{{36, 14}, {39, 20}, {40, 11}, {30, 10}} {
+		h, g := textOnlyHarness(sz[0], sz[1], playing(0, 200*time.Second), Deps{Volume: &fakeVol{}})
+		for i, r := range h.rows() {
+			if lipgloss.Width(r) > sz[0] {
+				t.Errorf("%v: row %d is %d wide", sz, i, lipgloss.Width(r))
+			}
+		}
+		if l, r := margins(t, h, g, 2); !near(l, r) {
+			t.Errorf("%v: title margins %d / %d", sz, l, r)
+		}
+	}
+}
+
+func TestCoverKeyKeepsTheTextCentredInPortrait(t *testing.T) {
+	h := newHarness(playing(0, 200*time.Second), Deps{}).withDemoHistory()
+	h.resize(80, 50) // portrait: stacked
+	_, g1 := h.m.compose()
+	l1, r1 := margins(t, h, g1, 2)
+	h.press("a") // hide the cover: text only
+	_, g2 := h.m.compose()
+	l2, r2 := margins(t, h, g2, 2)
+	if !near(l1, r1) || !near(l2, r2) || l2 == 0 {
+		t.Errorf("the title stays centred when the cover is hidden: %d/%d then %d/%d", l1, r1, l2, r2)
+	}
+	if x1, x2 := g1.infoX+l1, g2.infoX+l2; !near(x1, x2) {
+		t.Errorf("and does not jump sideways: title at column %d, then %d", x1, x2)
+	}
+}
+
+func TestTextOnlyClicksStillLandOnTheShiftedIcons(t *testing.T) {
+	rec := &recorder{}
+	h, _ := textOnlyHarness(100, 30, playing(60*time.Second, 200*time.Second), Deps{Control: rec.control})
+	for _, g := range []string{h.m.icons.prev, h.m.icons.pause, h.m.icons.next} {
+		x, y := h.find(g)
+		run(h.click(x, y))
+	}
+	if len(rec.cmds) != 3 || rec.cmds[0].Kind != source.Previous || rec.cmds[1].Kind != source.TogglePlay || rec.cmds[2].Kind != source.Next {
+		t.Errorf("clicks on the centred icons: %+v", rec.cmds)
 	}
 }
 
@@ -297,5 +378,26 @@ func TestResizingAcrossTheStackingBoundaryMovesTheAlignment(t *testing.T) {
 	_, g = h.m.compose()
 	if x := cellX(h.rows()[g.infoY+2], "Low Orbit"); x != g.infoX {
 		t.Errorf("and back to left aligned: %d vs %d", x, g.infoX)
+	}
+}
+
+// A label wider than the card used to wrap onto a second row, shifting every row
+// below it (and with them the mouse hit rows).
+func TestLabelNeverWrapsInNarrowCards(t *testing.T) {
+	for _, cover := range []bool{true, false} {
+		for w := 22; w <= 60; w++ {
+			cfg := cfgWith(func(c *config.Config) { c.ShowCover = cover })
+			h := newHarness(playing(0, 200*time.Second), Deps{Config: cfg}).withDemoHistory()
+			h.resize(w, 24)
+			_, g := h.m.compose()
+			rows := h.rows()
+			if g.infoY+2 >= len(rows) || !strings.Contains(rows[g.infoY+2], "Low Orbit") {
+				t.Errorf("w=%d cover=%v: the title is not on info row 2; the label probably wrapped:\n%s", w, cover, strings.Join(rows, "\n"))
+				continue
+			}
+			if n := strings.Count(strings.Join(rows, "\n"), "♫"); n != 1 {
+				t.Errorf("w=%d cover=%v: the label appears %d times", w, cover, n)
+			}
+		}
 	}
 }

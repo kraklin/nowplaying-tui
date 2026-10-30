@@ -227,20 +227,31 @@ func (m Model) info(l layout, accentHex string) string {
 	ac := accentStyle(accentHex)
 	s := m.state
 	line := func(x string) string { return lipgloss.NewStyle().Width(w).Render(x) }
-	// Stacked (narrow or portrait) cards centre their text under the cover.
+	// Text is centred unless it sits beside the cover: stacked cards centre it under
+	// the cover, and a card without a cover is a centred column of text.
 	align := func(x string) string {
-		if l.mode == stacked {
+		if l.mode != sideBySide {
 			return centerIn(x, w)
 		}
 		return x
 	}
 
 	// A note (error, confirmation) takes over the label row; it must stay one row.
-	labelRow := m.th.dim.Render("♫  now playing")
+	// The label must stay on one row (the mouse rows depend on it): drop the app tag
+	// when it does not fit, and cut the label itself in a very narrow card.
+	const labelText = "♫  now playing"
+	labelRow := m.th.dim.Render(labelText)
+	tag := appName(s.App)
 	if s.Status == source.StatusReconnecting {
-		labelRow += "  " + m.th.dim2.Render("reconnecting…")
-	} else if app := appName(s.App); app != "" && !s.Empty() {
-		labelRow += "  " + m.th.dim2.Render(app)
+		tag = "reconnecting…"
+	} else if s.Empty() {
+		tag = ""
+	}
+	switch {
+	case lipgloss.Width(labelText) > w:
+		labelRow = m.th.dim.Render(strings.TrimRight(fit(labelText, w), " "))
+	case tag != "" && lipgloss.Width(labelText)+2+lipgloss.Width(tag) <= w:
+		labelRow += "  " + m.th.dim2.Render(tag)
 	}
 	if m.note != "" {
 		tail := m.noteTail
@@ -383,9 +394,10 @@ func (m Model) transportRow(ac lipgloss.Style, w int) (row string, hits []hit, v
 	left := strings.Join(parts, iconGap)
 	lw := lipgloss.Width(left)
 
-	// Stacked cards centre the icons; the volume bar stays at the right edge.
+	// Cards that are not side by side centre the icons; the volume bar stays at the
+	// right edge.
 	lead := 0
-	if m.layout().mode == stacked {
+	if m.layout().mode != sideBySide {
 		lead = max((w-lw)/2, 0)
 	}
 
