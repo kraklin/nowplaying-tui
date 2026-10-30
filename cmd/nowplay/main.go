@@ -17,6 +17,7 @@ import (
 	"github.com/tomaslatall/nowplay/internal/history"
 	"github.com/tomaslatall/nowplay/internal/source"
 	"github.com/tomaslatall/nowplay/internal/ui"
+	"github.com/tomaslatall/nowplay/internal/volume"
 )
 
 func main() {
@@ -45,6 +46,13 @@ func main() {
 		}
 		src, recent = mc, nil
 	}
+	deps := ui.Deps{Control: src.Control}
+	if *demo {
+		deps.Volume = volume.NewFake(55)
+	} else if volume.Available() {
+		deps.Volume = volume.New()
+	}
+
 	states := make(chan source.State, 1)
 	stopped := make(chan struct{})
 	go func() {
@@ -52,7 +60,7 @@ func main() {
 		close(stopped)
 	}()
 
-	p := tea.NewProgram(ui.New(states, recent, bg), tea.WithAltScreen())
+	p := tea.NewProgram(ui.New(states, recent, bg, deps), tea.WithAltScreen())
 	go func() {
 		<-ctx.Done()
 		p.Quit()

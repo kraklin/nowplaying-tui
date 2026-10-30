@@ -96,28 +96,26 @@ func (m Model) info(l layout, accentHex string) string {
 	if app := appName(s.App); app != "" && !s.Empty() {
 		label += "  " + m.th.dim2.Render(app)
 	}
+	if m.note != "" {
+		label += "  " + m.th.dim.Render("· "+m.note)
+	}
 	title, sub := "nothing playing", ""
 	if !s.Empty() {
 		title = s.Title
 		sub = lipgloss.NewStyle().Bold(true).Render(s.Artist) + m.th.dim.Render(" · "+s.Album)
 	}
 
-	var elapsed, total int
-	frac := 0.0
+	var elapsed int
 	if !s.Empty() {
 		elapsed = int(s.Position(m.now).Seconds())
-		total = int(s.Duration.Seconds())
-		if total > 0 {
-			frac = float64(elapsed) / float64(total)
-		}
 	}
-	timeStr := fmtDur(elapsed) + " / " + fmtDur(total)
+	progress := m.progress(ac, w, elapsed)
 
 	lines := []string{
 		m.th.dim.Render(label), "",
 		line(ac.Render(fit(title, w))),
 		line(m.truncStyled(sub, s.Artist+" · "+s.Album, w)), "",
-		line(m.bar(ac, frac, w-lipgloss.Width(timeStr)-2) + "  " + m.th.dim.Render(timeStr)), "",
+		line(progress), "",
 		line(m.transport(ac, w)), "",
 	}
 	if l.histRows > 0 {
@@ -127,6 +125,22 @@ func (m Model) info(l layout, accentHex string) string {
 		lines = lines[:len(lines)-1]
 	}
 	return lipgloss.NewStyle().Width(w).Render(strings.Join(lines, "\n"))
+}
+
+// progress is the bar with m:ss / m:ss, or only the elapsed time for streams
+// with no duration.
+func (m Model) progress(ac lipgloss.Style, w, elapsed int) string {
+	s := m.state
+	if !s.Empty() && s.Duration <= 0 {
+		return m.th.dim.Render(fmtDur(elapsed))
+	}
+	total := int(s.Duration.Seconds())
+	frac := 0.0
+	if total > 0 {
+		frac = float64(elapsed) / float64(total)
+	}
+	timeStr := fmtDur(elapsed) + " / " + fmtDur(total)
+	return m.bar(ac, frac, w-lipgloss.Width(timeStr)-2) + "  " + m.th.dim.Render(timeStr)
 }
 
 // truncStyled returns styled when plain fits in w, otherwise a truncated dim version.
@@ -158,7 +172,7 @@ func (m Model) transport(ac lipgloss.Style, w int) string {
 	left := strings.Join([]string{m.th.dim2.Render(ic.shuffle), ic.prev, ac.Render(playIcon), ic.next, m.th.dim2.Render(ic.repeat)}, "   ")
 
 	const volW = 10
-	filled := m.volume * volW / 100
+	filled := max(m.volume, 0) * volW / 100
 	vol := ic.volume + " " + ac.Render(strings.Repeat("━", filled)) + m.th.dim2.Render(strings.Repeat("─", volW-filled))
 	pad := w - lipgloss.Width(left) - lipgloss.Width(vol)
 	if pad < 2 {

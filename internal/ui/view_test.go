@@ -25,7 +25,7 @@ func settle(t *testing.T, w, h int, empty bool) Model {
 		st = source.State{}
 	}
 	ch <- st
-	var m tea.Model = New(ch, history.Demo(), art.DarkBG)
+	var m tea.Model = New(ch, history.Demo(), art.DarkBG, Deps{})
 	var cmds []tea.Cmd
 	for _, msg := range []tea.Msg{tea.WindowSizeMsg{Width: w, Height: h}, StateMsg(<-ch)} {
 		var c tea.Cmd
