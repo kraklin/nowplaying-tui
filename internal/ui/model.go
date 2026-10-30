@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/tomaslatall/nowplay/internal/art"
+	"github.com/tomaslatall/nowplay/internal/config"
 	"github.com/tomaslatall/nowplay/internal/history"
 	"github.com/tomaslatall/nowplay/internal/source"
 )
@@ -71,6 +72,7 @@ const (
 	noteFor     = 3 * time.Second
 	confirmNote = "clear history? press c again"
 	confirmFor  = 5 * time.Second
+	warnFor     = 8 * time.Second
 )
 
 // Volume is the system volume. Calls are slow and must run inside a tea.Cmd.
@@ -79,14 +81,15 @@ type Volume interface {
 	Set(int) error
 }
 
-// Deps are the side-effecting collaborators; all are optional.
+// Deps are the collaborators and settings the model is built from; all are
+// optional.
 type Deps struct {
 	Control func(source.Cmd) error
 	Volume  Volume
 	History *history.Store // nil keeps the history in memory only
-	// MinPlay and HistorySize default to history.DefaultMinPlay and DefaultSize.
-	MinPlay     time.Duration
-	HistorySize int
+	Config  *config.Config // nil means config.Default()
+	// Warnings (from loading the config) are shown briefly on the label row.
+	Warnings []string
 }
 
 type Model struct {
@@ -109,8 +112,11 @@ type Model struct {
 	seekAt    time.Time
 	seekTo    time.Duration
 	note      string
+	noteTail  string // always kept visible when the note is truncated
 	noteUntil time.Time
 
+	cfg          config.Config
+	help         bool
 	tracker      *history.Tracker
 	histMax      int
 	histSeq      uint64
@@ -119,13 +125,16 @@ type Model struct {
 
 // New builds the model; bg is the terminal background colour.
 func New(states <-chan source.State, recent []history.Entry, bg color.RGBA, deps Deps) Model {
-	histMax := deps.HistorySize
-	if histMax <= 0 {
-		histMax = history.DefaultSize
+	cfg := config.Default()
+	if deps.Config != nil {
+		cfg = *deps.Config
 	}
-	return Model{
-		tracker: history.NewTracker(deps.MinPlay),
-		histMax: histMax,
+	opts := art.DefaultOptions(bg)
+	opts.Quantize, opts.Scanlines = cfg.QuantizeColors, cfg.Scanlines
+	m := Model{
+		cfg:     cfg,
+		tracker: history.NewTracker(time.Duration(cfg.MinPlaySeconds) * time.Second),
+		histMax: cfg.HistorySize,
 		src:     states,
 		deps:    deps,
 		clock:   time.Now,
@@ -134,10 +143,17 @@ func New(states <-chan source.State, recent []history.Entry, bg color.RGBA, deps
 		now:     time.Now(),
 		cache:   map[artKey]art.Result{},
 		pending: map[artKey]bool{},
-		icons:   unicodeIcons,
-		opts:    art.DefaultOptions(bg),
+		icons:   iconSet(cfg.Icons),
+		opts:    opts,
 		th:      newTheme(bg),
 	}
+	if len(deps.Warnings) > 0 {
+		m.setNoteFor(deps.Warnings[0], warnFor)
+		if n := len(deps.Warnings) - 1; n > 0 {
+			m.noteTail = sprintf(" (+%d more)", n)
+		}
+	}
+	return m
 }
 
 func (m Model) Init() tea.Cmd {
@@ -232,7 +248,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TickMsg:
 		m.now = time.Time(msg)
 		if m.note != "" && m.now.After(m.noteUntil) {
-			m.note = ""
+			m.note, m.noteTail = "", ""
 		}
 		return m, tick()
 	case VolumeMsg:
@@ -262,6 +278,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		return m.key(msg)
+	case tea.MouseMsg:
+		return m.mouse(msg)
 	}
 	return m, nil
 }
@@ -269,7 +287,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) setNote(s string) { m.setNoteFor(s, noteFor) }
 
 func (m *Model) setNoteFor(s string, d time.Duration) {
-	m.note = s
+	m.note, m.noteTail = s, ""
 	m.noteUntil = m.clock().Add(d)
 }
 
@@ -293,6 +311,9 @@ func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.note = ""
 	}
 	switch msg.String() {
+	case "?":
+		m.help = !m.help
+		return m, nil
 	case "c":
 		if armed {
 			m.recent, m.note = nil, ""
@@ -348,9 +369,68 @@ func (m Model) seek(delta time.Duration) (tea.Model, tea.Cmd) {
 	if !m.seekAt.IsZero() && now.Sub(m.seekAt) < seekChain {
 		base = m.seekTo
 	}
-	target := max(0, min(base+delta, s.Duration))
-	m.seekAt, m.seekTo = now, target
+	return m.seekTarget(base + delta)
+}
+
+// seekTarget seeks to an absolute position, clamped to the track.
+func (m Model) seekTarget(target time.Duration) (tea.Model, tea.Cmd) {
+	s := m.state
+	if s.Empty() || s.Duration <= 0 {
+		return m, nil
+	}
+	target = max(0, min(target, s.Duration))
+	m.seekAt, m.seekTo = m.clock(), target
 	return m, m.send("seek", source.Cmd{Kind: source.Seek, Seconds: target.Seconds()})
+}
+
+// mouse handles clicks on the transport icons and progress bar and scrolling
+// over the volume bar. Positions come from the same layout View draws.
+func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if m.state.Status == source.StatusMissing || msg.Action != tea.MouseActionPress {
+		return m, nil
+	}
+	_, g := m.compose()
+	row, col := msg.Y-g.infoY, msg.X-g.infoX
+	if col < 0 || col >= g.infoW {
+		return m, nil
+	}
+	_, hits, vol := m.transportRow(accentStyle("#000000"), g.infoW)
+	switch msg.Button {
+	case tea.MouseButtonLeft:
+		switch row {
+		case rowProgress:
+			if bw := m.barWidth(g.infoW); bw > 1 && col < bw && !m.state.Empty() {
+				frac := float64(col) / float64(bw-1)
+				return m.seekTarget(time.Duration(frac * float64(m.state.Duration)))
+			}
+		case rowTransport:
+			for _, h := range hits {
+				if col >= h.x0 && col < h.x1 {
+					return m, m.send(opName(h.cmd), h.cmd)
+				}
+			}
+		}
+	case tea.MouseButtonWheelUp, tea.MouseButtonWheelDown:
+		if row == rowTransport && vol[0] >= 0 && col >= vol[0] && col < vol[1] {
+			if msg.Button == tea.MouseButtonWheelUp {
+				return m.changeVolume(volStep)
+			}
+			return m.changeVolume(-volStep)
+		}
+	}
+	return m, nil
+}
+
+func opName(c source.Cmd) string {
+	switch c.Kind {
+	case source.TogglePlay:
+		return "play/pause"
+	case source.Next:
+		return "next"
+	case source.Previous:
+		return "previous"
+	}
+	return "command"
 }
 
 func (m Model) changeVolume(delta int) (tea.Model, tea.Cmd) {

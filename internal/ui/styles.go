@@ -2,6 +2,7 @@ package ui
 
 import (
 	"math"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -15,8 +16,25 @@ type icons struct {
 	shuffle, prev, play, pause, next, repeat, volume string
 }
 
-// Geometric glyphs only: ⏮ ⏸ ⏭ 🔈 render as double-width emoji in many terminals.
-var unicodeIcons = icons{"⇄", "|◂", "▶ ", "▮▮", "▸|", "↻", "♪"}
+// Icon sets, chosen with `icons` in the config. All glyphs here measure one cell
+// wide, and play and pause match, so the transport row never shifts.
+var (
+	unicodeIcons = icons{"⇄", "⏮", "⏵", "⏸", "⏭", "↻", "♪"}
+	// basicIcons avoids ⏮ ⏵ ⏸ ⏭, which some terminals draw as double-width emoji.
+	basicIcons = icons{"⇄", "|◂", "▶ ", "▮▮", "▸|", "↻", "♪"}
+	// nerdIcons needs a Nerd Font.
+	nerdIcons = icons{"\uf074", "\uf048", "\uf04b", "\uf04c", "\uf051", "\uf01e", "\uf028"}
+)
+
+func iconSet(name string) icons {
+	switch name {
+	case "nerd":
+		return nerdIcons
+	case "basic":
+		return basicIcons
+	}
+	return unicodeIcons
+}
 
 // fit truncates plain text to w cells with … and pads it with spaces to w.
 func fit(s string, w int) string {
@@ -58,3 +76,7 @@ func fade(i int) float64 { return math.Max(0.2, math.Exp(-0.22*float64(i))) }
 func fadedStyle(base, bg [3]uint8, f float64) lipgloss.Style {
 	return colorStyle(mix(bg, base, f))
 }
+
+var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string { return ansiRe.ReplaceAllString(s, "") }

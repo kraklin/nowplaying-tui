@@ -316,8 +316,8 @@ func TestPausedProgressFreezes(t *testing.T) {
 	if !strings.Contains(h.m.View(), "0:30 / 3:58") {
 		t.Errorf("paused bar must not move:\n%s", h.m.View())
 	}
-	if !strings.Contains(h.m.View(), "▶") {
-		t.Errorf("paused shows the play icon")
+	if v := h.m.View(); !strings.Contains(v, h.m.icons.play) || strings.Contains(v, h.m.icons.pause) {
+		t.Errorf("paused shows the play icon, not pause:\n%s", v)
 	}
 }
 

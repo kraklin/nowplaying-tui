@@ -28,11 +28,10 @@ type current struct {
 	resumeAt time.Time // zero while paused
 }
 
+// NewTracker returns a tracker that needs minPlay of real play time; zero
+// records every track.
 func NewTracker(minPlay time.Duration) *Tracker {
-	if minPlay <= 0 {
-		minPlay = DefaultMinPlay
-	}
-	return &Tracker{MinPlay: minPlay}
+	return &Tracker{MinPlay: max(minPlay, 0)}
 }
 
 // Observe feeds the tracker one state. It returns the entry of the track that

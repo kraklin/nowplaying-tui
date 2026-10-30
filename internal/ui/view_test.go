@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image/color"
 	"os"
 	"strings"
 	"testing"
@@ -18,6 +19,11 @@ import (
 // settle feeds the fake's first state and size, then runs art commands to completion.
 func settle(t *testing.T, w, h int, empty bool) Model {
 	t.Helper()
+	return settleBG(t, w, h, empty, art.DarkBG)
+}
+
+func settleBG(t *testing.T, w, h int, empty bool, bg color.RGBA) Model {
+	t.Helper()
 	ch := make(chan source.State, 1)
 	f := source.NewFake()
 	st := f.Snapshot()
@@ -25,7 +31,7 @@ func settle(t *testing.T, w, h int, empty bool) Model {
 		st = source.State{}
 	}
 	ch <- st
-	var m tea.Model = New(ch, history.Demo(), art.DarkBG, Deps{})
+	var m tea.Model = New(ch, history.Demo(), bg, Deps{Volume: demoVolume{}})
 	var cmds []tea.Cmd
 	for _, msg := range []tea.Msg{tea.WindowSizeMsg{Width: w, Height: h}, StateMsg(<-ch)} {
 		var c tea.Cmd
@@ -53,6 +59,11 @@ func settle(t *testing.T, w, h int, empty bool) Model {
 	}
 	return m.(Model)
 }
+
+type demoVolume struct{}
+
+func (demoVolume) Get() (int, error) { return 55, nil }
+func (demoVolume) Set(int) error     { return nil }
 
 func TestViewFitsPane(t *testing.T) {
 	cases := []struct {

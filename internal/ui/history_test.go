@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/tomaslatall/nowplay/internal/config"
 	"github.com/tomaslatall/nowplay/internal/history"
 	"github.com/tomaslatall/nowplay/internal/source"
 )
@@ -216,7 +217,9 @@ func TestHistoryWorksWithoutAStore(t *testing.T) {
 }
 
 func TestHistorySizeIsCapped(t *testing.T) {
-	h := newHarness(track("T0"), Deps{HistorySize: 3})
+	cfg := config.Default()
+	cfg.HistorySize = 3
+	h := newHarness(track("T0"), Deps{Config: &cfg})
 	for i := 1; i <= 6; i++ {
 		h.advance(30 * time.Second)
 		h.next(track(string(rune('A' + i))))
