@@ -129,7 +129,6 @@ func (m Model) missingView() string {
 		m.th.dim.Render("nowplaying reads what is playing through media-control."),
 		m.th.dim.Render("Install it with:"),
 		"",
-		accent.Render("  brew tap ungive/media-control"),
 		accent.Render("  brew install media-control"),
 		"",
 		m.th.dim.Render("Then start nowplaying again. Press q to quit."),

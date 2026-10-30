@@ -400,7 +400,7 @@ func TestMissingMediaControlShowsInstallHint(t *testing.T) {
 		h.resize(sz[0], sz[1])
 		v := stripANSI(h.m.View())
 		if sz[0] >= 50 {
-			for _, want := range []string{"media-control not found", "brew tap ungive/media-control", "brew install media-control", "q to quit"} {
+			for _, want := range []string{"media-control not found", "brew install media-control", "q to quit"} {
 				if !strings.Contains(v, want) {
 					t.Errorf("%v: missing %q:\n%s", sz, want, v)
 				}

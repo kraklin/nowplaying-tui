@@ -18,18 +18,20 @@ for the session unless you turn on `persist_history`).
 
 ## Install
 
-nowplaying needs macOS and `media-control`:
+nowplaying needs macOS.
+
+With Homebrew (this also installs [`media-control`](https://github.com/ungive/media-control),
+which it reads the playing track through):
 
 ```sh
-brew tap ungive/media-control
-brew install media-control
+brew install kraklin/tap/nowplaying
 ```
 
-Build nowplaying with Go 1.26 or newer (older Go versions fetch the right toolchain
-automatically):
+Or build it yourself with Go 1.26 or newer (older Go versions fetch the right
+toolchain automatically), after `brew install media-control`:
 
 ```sh
-git clone <this repository> && cd nowplaying-tui
+git clone https://github.com/kraklin/nowplaying-tui && cd nowplaying-tui
 go build -ldflags "-X main.version=$(git describe --tags --always)" -o nowplaying ./cmd/nowplaying
 install -m 755 nowplaying /usr/local/bin/nowplaying   # or anywhere on your PATH
 ```
