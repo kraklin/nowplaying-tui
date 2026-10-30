@@ -13,17 +13,19 @@ func accentStyle(hex string) lipgloss.Style {
 }
 
 type icons struct {
-	shuffle, prev, play, pause, next, repeat, volume string
+	prev, back, play, pause, fwd, next, volume string
 }
 
-// Icon sets, chosen with `icons` in the config. All glyphs here measure one cell
-// wide, and play and pause match, so the transport row never shifts.
+// Icon sets, chosen with `icons` in the config. The default set uses text
+// symbols only: each rune is one cell wide and none has an emoji presentation
+// (⏪ and ⏩ do, which is why back and forward are ⏴⏴ and ⏵⏵). Play and pause
+// match in width so the transport row never shifts.
 var (
-	unicodeIcons = icons{"⇄", "⏮", "⏵", "⏸", "⏭", "↻", "♪"}
-	// basicIcons avoids ⏮ ⏵ ⏸ ⏭, which some terminals draw as double-width emoji.
-	basicIcons = icons{"⇄", "|◂", "▶ ", "▮▮", "▸|", "↻", "♪"}
+	unicodeIcons = icons{"⏮", "⏴⏴", "⏵", "⏸", "⏵⏵", "⏭", "♪"}
+	// basicIcons avoids the ⏮ ⏴ ⏵ ⏸ ⏭ block, for fonts that lack it.
+	basicIcons = icons{"|◂", "◂◂", "▶ ", "▮▮", "▸▸", "▸|", "♪"}
 	// nerdIcons needs a Nerd Font.
-	nerdIcons = icons{"\uf074", "\uf048", "\uf04b", "\uf04c", "\uf051", "\uf01e", "\uf028"}
+	nerdIcons = icons{"\uf048", "\uf049", "\uf04b", "\uf04c", "\uf050", "\uf051", "\uf028"}
 )
 
 func iconSet(name string) icons {

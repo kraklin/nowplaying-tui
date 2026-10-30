@@ -292,10 +292,20 @@ func (m Model) bar(ac lipgloss.Style, frac float64, w int) string {
 	return filled + m.th.dim2.Render(strings.Repeat("─", w-knob-1))
 }
 
+type action int
+
+const (
+	actPrev action = iota
+	actBack
+	actPlay
+	actFwd
+	actNext
+)
+
 // hit is a clickable span of the transport row, in cells from its left edge.
 type hit struct {
 	x0, x1 int // [x0, x1)
-	cmd    source.Cmd
+	act    action
 }
 
 // transportRow renders the icons and volume bar and reports where they are, so
@@ -303,31 +313,27 @@ type hit struct {
 // bar is not shown.
 func (m Model) transportRow(ac lipgloss.Style, w int) (row string, hits []hit, vol [2]int) {
 	ic := m.icons
-	playIcon, playCmd := ic.pause, source.Cmd{Kind: source.TogglePlay}
+	playIcon := ic.pause
 	if !m.state.Playing {
 		playIcon = ic.play
 	}
-	type item struct {
+	items := []struct {
 		styled, plain string
-		cmd           *source.Cmd
-	}
-	prev, next := source.Cmd{Kind: source.Previous}, source.Cmd{Kind: source.Next}
-	items := []item{
-		{m.th.dim2.Render(ic.shuffle), ic.shuffle, nil}, // not supported by the stream yet
-		{ic.prev, ic.prev, &prev},
-		{ac.Render(playIcon), playIcon, &playCmd},
-		{ic.next, ic.next, &next},
-		{m.th.dim2.Render(ic.repeat), ic.repeat, nil},
+		act           action
+	}{
+		{ic.prev, ic.prev, actPrev},
+		{ic.back, ic.back, actBack},
+		{ac.Render(playIcon), playIcon, actPlay},
+		{ic.fwd, ic.fwd, actFwd},
+		{ic.next, ic.next, actNext},
 	}
 	parts := make([]string, len(items))
 	x := 0
 	for i, it := range items {
 		parts[i] = it.styled
 		width := lipgloss.Width(it.plain)
-		if it.cmd != nil {
-			// one cell of slack either side; the 3-cell gaps keep spans apart
-			hits = append(hits, hit{x - 1, x + width + 1, *it.cmd})
-		}
+		// one cell of slack either side; the 3-cell gaps keep spans apart
+		hits = append(hits, hit{x - 1, x + width + 1, it.act})
 		x += width + len(iconGap)
 	}
 	left := strings.Join(parts, iconGap)

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -76,7 +77,7 @@ func TestGeometryMatchesWhatIsDrawn(t *testing.T) {
 		}
 		_, hits, vol := h.m.transportRow(accentStyle("#000000"), g.infoW)
 		ic := h.m.icons
-		for name, glyph := range map[string]string{"previous": ic.prev, "play/pause": ic.pause, "next": ic.next} {
+		for name, glyph := range map[string]string{"previous": ic.prev, "backward": ic.back, "play/pause": ic.pause, "forward": ic.fwd, "next": ic.next} {
 			x, y := h.find(glyph)
 			if y != g.infoY+rowTransport {
 				t.Errorf("%v: %s drawn on row %d, geometry says %d", sz, name, y, g.infoY+rowTransport)
@@ -192,19 +193,18 @@ func TestClicksElsewhereDoNothing(t *testing.T) {
 	_, g := h.m.compose()
 	px, py := h.find(h.m.icons.prev)
 	for name, pos := range map[string][2]int{
-		"title":            {g.infoX + 2, g.infoY + 2},
-		"artist":           {g.infoX + 2, g.infoY + 3},
-		"label":            {g.infoX + 2, g.infoY},
-		"shuffle":          {g.infoX, py},
-		"repeat":           {g.infoX + g.infoW/2 - 2, py},
-		"between icons":    {px + 2, py},
-		"cover":            {2, g.infoY + 3},
-		"left of the pane": {0, 0},
-		"below everything": {g.infoX + 3, 19},
-		"time text":        {g.infoX + g.infoW - 3, g.infoY + rowProgress},
-		"blank row":        {g.infoX + 3, g.infoY + 4},
-		"far outside":      {500, 500},
-		"negative":         {-1, -1},
+		"title":              {g.infoX + 2, g.infoY + 2},
+		"artist":             {g.infoX + 2, g.infoY + 3},
+		"label":              {g.infoX + 2, g.infoY},
+		"past the last icon": {g.infoX + 22, py},
+		"between icons":      {px + 2, py},
+		"cover":              {2, g.infoY + 3},
+		"left of the pane":   {0, 0},
+		"below everything":   {g.infoX + 3, 19},
+		"time text":          {g.infoX + g.infoW - 3, g.infoY + rowProgress},
+		"blank row":          {g.infoX + 3, g.infoY + 4},
+		"far outside":        {500, 500},
+		"negative":           {-1, -1},
 	} {
 		if cmd := h.click(pos[0], pos[1]); cmd != nil {
 			t.Errorf("click on %s at %v should do nothing", name, pos)
@@ -483,9 +483,9 @@ func cfgWith(f func(*config.Config)) *config.Config {
 
 func TestIconSetsFromConfig(t *testing.T) {
 	for set, want := range map[string][]string{
-		"unicode": {"⏮", "⏸", "⏭"},
-		"basic":   {"|◂", "▮▮", "▸|"},
-		"nerd":    {"\uf048", "\uf04c", "\uf051"},
+		"unicode": {"⏮", "⏴⏴", "⏸", "⏵⏵", "⏭"},
+		"basic":   {"|◂", "◂◂", "▮▮", "▸▸", "▸|"},
+		"nerd":    {"\uf048", "\uf049", "\uf04c", "\uf050", "\uf051"},
 	} {
 		h := newHarness(playing(0, 200*time.Second), Deps{Config: cfgWith(func(c *config.Config) { c.Icons = set })})
 		v := h.m.View()
@@ -503,14 +503,17 @@ func TestIconSetsKeepTheRowSteady(t *testing.T) {
 		if lipgloss.Width(ic.play) != lipgloss.Width(ic.pause) {
 			t.Errorf("%s: play (%d) and pause (%d) must be the same width or the row shifts when you pause", set, lipgloss.Width(ic.play), lipgloss.Width(ic.pause))
 		}
-		for _, g := range []string{ic.shuffle, ic.prev, ic.play, ic.pause, ic.next, ic.repeat, ic.volume} {
+		for _, g := range []string{ic.prev, ic.back, ic.play, ic.pause, ic.fwd, ic.next, ic.volume} {
 			if w := lipgloss.Width(g); w < 1 || w > 2 {
 				t.Errorf("%s: %q is %d cells wide", set, g, w)
 			}
 		}
 	}
 	if w := lipgloss.Width("⏮⏵⏸⏭"); w != 4 {
-		t.Errorf("the default glyphs must measure one cell each, got %d for four", w)
+		t.Errorf("⏮ ⏵ ⏸ ⏭ must measure one cell each, got %d for four", w)
+	}
+	if w := lipgloss.Width("⏴⏴⏵⏵"); w != 4 {
+		t.Errorf("⏴⏴ and ⏵⏵ are two one-cell glyphs each, got %d for two pairs", w)
 	}
 }
 
@@ -691,6 +694,174 @@ func TestSideBySideLayoutRules(t *testing.T) {
 		}
 		if lx := cellX(rows[label], "♫"); lx-coverEnd != gap {
 			t.Errorf("%v: %d cells between cover and info, want %d", sz, lx-coverEnd, gap)
+		}
+	}
+}
+
+// --- back / forward buttons -----------------------------------------------------
+
+func TestTransportRowIsPrevBackPlayFwdNext(t *testing.T) {
+	h := newHarness(playing(0, 200*time.Second), Deps{})
+	ic := h.m.icons
+	var xs []int
+	for _, g := range []string{ic.prev, ic.back, ic.pause, ic.fwd, ic.next} {
+		x, _ := h.find(g)
+		if x < 0 {
+			t.Fatalf("%q not drawn", g)
+		}
+		xs = append(xs, x)
+	}
+	for i := 1; i < len(xs); i++ {
+		if xs[i] <= xs[i-1] {
+			t.Errorf("order should be previous, backward, play/pause, forward, next; columns %v", xs)
+		}
+	}
+	v := h.m.View()
+	for _, gone := range []string{"⇄", "↻"} {
+		if strings.Contains(v, gone) {
+			t.Errorf("the unused shuffle/repeat placeholders (%s) should be gone", gone)
+		}
+	}
+}
+
+func TestHitSpansDoNotOverlap(t *testing.T) {
+	for _, set := range []string{"unicode", "basic", "nerd"} {
+		h := newHarness(playing(0, 200*time.Second), Deps{Config: cfgWith(func(c *config.Config) { c.Icons = set })})
+		_, g := h.m.compose()
+		_, hits, _ := h.m.transportRow(accentStyle("#000000"), g.infoW)
+		if len(hits) != 5 {
+			t.Fatalf("%s: want 5 buttons, got %d", set, len(hits))
+		}
+		for i := 1; i < len(hits); i++ {
+			if hits[i].x0 < hits[i-1].x1 {
+				t.Errorf("%s: spans %v and %v overlap, so a click could hit the wrong button", set, hits[i-1], hits[i])
+			}
+		}
+		// every button's own glyph cells are inside its span, whatever their width
+		ic := h.m.icons
+		for i, glyph := range []string{ic.prev, ic.back, ic.pause, ic.fwd, ic.next} {
+			x, _ := h.find(glyph)
+			w := lipgloss.Width(glyph)
+			if x-g.infoX < hits[i].x0 || x-g.infoX+w > hits[i].x1 {
+				t.Errorf("%s: %q at %d..%d is outside its span %v", set, glyph, x-g.infoX, x-g.infoX+w, hits[i])
+			}
+		}
+	}
+}
+
+func TestClickBackAndForwardSeekByFiveSeconds(t *testing.T) {
+	for _, set := range []string{"unicode", "basic", "nerd"} {
+		rec := &recorder{}
+		h := newHarness(playing(60*time.Second, 200*time.Second), Deps{Control: rec.control, Config: cfgWith(func(c *config.Config) { c.Icons = set })})
+		bx, by := h.find(h.m.icons.back)
+		fx, fy := h.find(h.m.icons.fwd)
+		run(h.click(bx, by))
+		*h.now = t0.Add(2 * time.Second) // well past the chaining window
+		h.m.seekAt = time.Time{}
+		run(h.click(fx, fy))
+		got := seekTargets(rec)
+		// 60 s at t0; two seconds later the real position is 62 s
+		if len(got) != 2 || got[0] != 55 || got[1] != 67 {
+			t.Errorf("%s: back then forward should seek to 55 and 67, got %v", set, got)
+		}
+	}
+}
+
+func TestClickingBackAndForwardIsTheSameAsTheArrowKeys(t *testing.T) {
+	keys, clicks := &recorder{}, &recorder{}
+	hk := newHarness(playing(60*time.Second, 200*time.Second), Deps{Control: keys.control})
+	hc := newHarness(playing(60*time.Second, 200*time.Second), Deps{Control: clicks.control})
+	bx, by := hc.find(hc.m.icons.back)
+	fx, fy := hc.find(hc.m.icons.fwd)
+	run(hk.press("left"))
+	run(hk.press("right"))
+	run(hc.click(bx, by))
+	run(hc.click(fx, fy))
+	k, c := seekTargets(keys), seekTargets(clicks)
+	if len(k) != 2 || len(c) != 2 || k[0] != c[0] || k[1] != c[1] {
+		t.Errorf("keys sent %v, clicks sent %v", k, c)
+	}
+}
+
+func TestRapidBackClicksChain(t *testing.T) {
+	rec := &recorder{}
+	h := newHarness(playing(100*time.Second, 200*time.Second), Deps{Control: rec.control})
+	bx, by := h.find(h.m.icons.back)
+	run(h.click(bx, by))
+	*h.now = t0.Add(100 * time.Millisecond)
+	run(h.click(bx, by))
+	run(h.click(bx, by))
+	if got := seekTargets(rec); len(got) != 3 || got[0] != 95 || got[1] != 90 || got[2] != 85 {
+		t.Errorf("three quick back clicks should walk back 5 s each time, got %v", got)
+	}
+}
+
+func TestBackAndForwardClampAtTheEnds(t *testing.T) {
+	rec := &recorder{}
+	h := newHarness(playing(2*time.Second, 200*time.Second), Deps{Control: rec.control})
+	bx, by := h.find(h.m.icons.back)
+	run(h.click(bx, by))
+	e := newHarness(playing(198*time.Second, 200*time.Second), Deps{Control: rec.control})
+	fx, fy := e.find(e.m.icons.fwd)
+	run(e.click(fx, fy))
+	if got := seekTargets(rec); len(got) != 2 || got[0] != 0 || got[1] != 200 {
+		t.Errorf("seeks should clamp to 0 and the duration, got %v", got)
+	}
+}
+
+func TestBackAndForwardDoNothingWithoutADuration(t *testing.T) {
+	rec := &recorder{}
+	live := newHarness(playing(30*time.Second, 0), Deps{Control: rec.control})
+	bx, by := live.find(live.m.icons.back)
+	fx, fy := live.find(live.m.icons.fwd)
+	if live.click(bx, by) != nil || live.click(fx, fy) != nil {
+		t.Errorf("a live stream cannot seek")
+	}
+	empty := newHarness(source.State{}, Deps{Control: rec.control})
+	bx, by = empty.find(empty.m.icons.back)
+	if empty.click(bx, by) != nil {
+		t.Errorf("nothing playing, nothing to seek")
+	}
+	if len(rec.cmds) != 0 {
+		t.Errorf("no commands expected: %+v", rec.cmds)
+	}
+}
+
+func TestGapsBetweenButtonsAreNotClickable(t *testing.T) {
+	rec := &recorder{}
+	h := newHarness(playing(60*time.Second, 200*time.Second), Deps{Control: rec.control})
+	ic := h.m.icons
+	_, y := h.find(ic.prev)
+	for i, pair := range [][2]string{{ic.prev, ic.back}, {ic.back, ic.pause}, {ic.pause, ic.fwd}, {ic.fwd, ic.next}} {
+		x0, _ := h.find(pair[0])
+		x1, _ := h.find(pair[1])
+		mid := (x0 + lipgloss.Width(pair[0]) + x1) / 2 // the middle cell of the gap
+		if cmd := h.click(mid, y); cmd != nil {
+			t.Errorf("gap %d at column %d should not be a button", i, mid)
+		}
+	}
+	if len(rec.cmds) != 0 {
+		t.Errorf("clicks in the gaps sent %+v", rec.cmds)
+	}
+}
+
+// Emoji-presentation glyphs (⏪ ⏩ …) are drawn wide and in colour by many
+// terminals. In the default set every rune must be one cell, which excludes them.
+func TestDefaultIconsAreTextGlyphsNotEmoji(t *testing.T) {
+	ic := unicodeIcons
+	for name, g := range map[string]string{"prev": ic.prev, "back": ic.back, "play": ic.play, "pause": ic.pause, "fwd": ic.fwd, "next": ic.next, "volume": ic.volume} {
+		if got, runes := lipgloss.Width(g), utf8.RuneCountInString(g); got != runes {
+			t.Errorf("%s %q is %d cells for %d rune(s): that is a wide emoji-style glyph", name, g, got, runes)
+		}
+		if strings.ContainsRune(g, '\uFE0F') {
+			t.Errorf("%s %q asks for emoji presentation", name, g)
+		}
+	}
+	for _, banned := range []string{"⏪", "⏩", "⏯", "▶️", "⏸️"} {
+		for _, g := range []string{ic.prev, ic.back, ic.play, ic.pause, ic.fwd, ic.next} {
+			if strings.Contains(g, banned) {
+				t.Errorf("the default set must not contain %q", banned)
+			}
 		}
 	}
 }

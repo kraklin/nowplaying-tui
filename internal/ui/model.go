@@ -405,8 +405,20 @@ func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 		case rowTransport:
 			for _, h := range hits {
-				if col >= h.x0 && col < h.x1 {
-					return m, m.send(opName(h.cmd), h.cmd)
+				if col < h.x0 || col >= h.x1 {
+					continue
+				}
+				switch h.act {
+				case actPrev:
+					return m, m.send("previous", source.Cmd{Kind: source.Previous})
+				case actNext:
+					return m, m.send("next", source.Cmd{Kind: source.Next})
+				case actPlay:
+					return m, m.send("play/pause", source.Cmd{Kind: source.TogglePlay})
+				case actBack:
+					return m.seek(-seekStep) // same as the left arrow
+				case actFwd:
+					return m.seek(seekStep)
 				}
 			}
 		}
@@ -419,18 +431,6 @@ func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
-}
-
-func opName(c source.Cmd) string {
-	switch c.Kind {
-	case source.TogglePlay:
-		return "play/pause"
-	case source.Next:
-		return "next"
-	case source.Previous:
-		return "previous"
-	}
-	return "command"
 }
 
 func (m Model) changeVolume(delta int) (tea.Model, tea.Cmd) {
