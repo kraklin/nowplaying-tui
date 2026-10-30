@@ -7,11 +7,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var (
-	dim  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#6b6b6b", Dark: "#8a8a8a"})
-	dim2 = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#9a9a9a", Dark: "#5c5c5c"})
-)
-
 func accentStyle(hex string) lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(hex))
 }
@@ -59,11 +54,7 @@ func fmtDur(secs int) string {
 // exponentially so older rows drift into the background.
 func fade(i int) float64 { return math.Max(0.2, math.Exp(-0.22*float64(i))) }
 
-// fadedStyle blends base towards the assumed terminal background by 1-f.
+// fadedStyle blends base towards the terminal background by 1-f.
 func fadedStyle(base, bg [3]uint8, f float64) lipgloss.Style {
-	var c [3]uint8
-	for k := range c {
-		c[k] = uint8(math.Round(float64(bg[k]) + (float64(base[k])-float64(bg[k]))*f))
-	}
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(sprintf("#%02x%02x%02x", c[0], c[1], c[2])))
+	return colorStyle(mix(bg, base, f))
 }

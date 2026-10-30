@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/tomaslatall/nowplay/internal/art"
 	"github.com/tomaslatall/nowplay/internal/history"
 	"github.com/tomaslatall/nowplay/internal/source"
 )
@@ -24,7 +25,7 @@ func settle(t *testing.T, w, h int, empty bool) Model {
 		st = source.State{}
 	}
 	ch <- st
-	var m tea.Model = New(ch, history.Demo())
+	var m tea.Model = New(ch, history.Demo(), art.DarkBG)
 	var cmds []tea.Cmd
 	for _, msg := range []tea.Msg{tea.WindowSizeMsg{Width: w, Height: h}, StateMsg(<-ch)} {
 		var c tea.Cmd

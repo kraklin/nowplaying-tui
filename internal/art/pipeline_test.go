@@ -163,7 +163,7 @@ func TestAccentFallbackAndContrast(t *testing.T) {
 		"all white": solid(16, 16, color.RGBA{255, 255, 255, 255}),
 		"dark navy": solid(16, 16, color.RGBA{10, 10, 40, 255}),
 	} {
-		res, err := Build(encodePNG(t, img), 16, DefaultOptions(true))
+		res, err := Build(encodePNG(t, img), 16, DefaultOptions(DarkBG))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -203,7 +203,7 @@ func TestCentreCropIsSquareFromTheMiddle(t *testing.T) {
 }
 
 func TestBuildRejectsGarbage(t *testing.T) {
-	if _, err := Build([]byte("not an image"), 16, DefaultOptions(true)); err == nil {
+	if _, err := Build([]byte("not an image"), 16, DefaultOptions(DarkBG)); err == nil {
 		t.Errorf("garbage must error so the UI can fall back to the placeholder")
 	}
 }
@@ -244,7 +244,7 @@ func sampleCovers() map[string]*image.RGBA {
 func TestGoldenRenders(t *testing.T) {
 	for name, img := range sampleCovers() {
 		for _, px := range []int{16, 28} {
-			res, err := Build(encodePNG(t, img), px, DefaultOptions(true))
+			res, err := Build(encodePNG(t, img), px, DefaultOptions(DarkBG))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -292,9 +292,9 @@ func TestRealCovers(t *testing.T) {
 	if len(covers) < 2 {
 		t.Fatalf("recording should hold two covers, found %d", len(covers))
 	}
-	for dark, bg := range map[bool]color.RGBA{true: {18, 18, 18, 255}, false: {255, 255, 255, 255}} {
+	for name, bg := range map[string]color.RGBA{"dark": DarkBG, "light": {255, 255, 255, 255}, "slate": {59, 61, 78, 255}} {
 		for i, c := range covers {
-			res, err := Build(c, 28, DefaultOptions(dark))
+			res, err := Build(c, 28, DefaultOptions(bg))
 			if err != nil {
 				t.Fatalf("cover %d: %v", i, err)
 			}
@@ -306,12 +306,12 @@ func TestRealCovers(t *testing.T) {
 				t.Fatal(err)
 			}
 			if got := contrast(color.RGBA{uint8(r), uint8(g), uint8(b), 255}, bg); got < 3 {
-				t.Errorf("cover %d dark=%v: accent %s only %.2f:1", i, dark, res.Accent, got)
+				t.Errorf("cover %d on %s: accent %s only %.2f:1", i, name, res.Accent, got)
 			}
 		}
 	}
-	a, _ := Build(covers[0], 28, DefaultOptions(true))
-	b, _ := Build(covers[1], 28, DefaultOptions(true))
+	a, _ := Build(covers[0], 28, DefaultOptions(DarkBG))
+	b, _ := Build(covers[1], 28, DefaultOptions(DarkBG))
 	if a.Rendered == b.Rendered {
 		t.Errorf("different covers rendered identically")
 	}

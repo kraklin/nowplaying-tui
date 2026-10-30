@@ -2,10 +2,10 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
 	"github.com/tomaslatall/nowplay/internal/art"
 	"github.com/tomaslatall/nowplay/internal/history"
@@ -45,9 +45,11 @@ type Model struct {
 	pending map[artKey]bool
 	icons   icons
 	opts    art.Options
+	th      theme
 }
 
-func New(states <-chan source.State, recent []history.Entry) Model {
+// New builds the model; bg is the terminal background colour.
+func New(states <-chan source.State, recent []history.Entry, bg color.RGBA) Model {
 	return Model{
 		src:     states,
 		recent:  recent,
@@ -56,7 +58,8 @@ func New(states <-chan source.State, recent []history.Entry) Model {
 		cache:   map[artKey]art.Result{},
 		pending: map[artKey]bool{},
 		icons:   unicodeIcons,
-		opts:    art.DefaultOptions(lipgloss.HasDarkBackground()),
+		opts:    art.DefaultOptions(bg),
+		th:      newTheme(bg),
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -91,11 +92,20 @@ func (m *MediaControl) Run(ctx context.Context, out chan<- State) {
 // runOnce runs one stream process to exit and reports whether it produced any state.
 func (m *MediaControl) runOnce(ctx context.Context, last *State, send func(State) bool) (got bool) {
 	cmd := exec.CommandContext(ctx, m.bin(), m.streamArgs()...)
+	// media-control is a wrapper that starts the real adapter as a child, so
+	// kill the whole process group, not just the wrapper.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	cmd.WaitDelay = time.Second
 	stdout, err := cmd.StdoutPipe()
 	if err != nil || cmd.Start() != nil {
 		return false
 	}
-	defer cmd.Wait()
+	pgid := cmd.Process.Pid
+	defer func() {
+		cmd.Wait()
+		syscall.Kill(-pgid, syscall.SIGKILL) // stragglers from a stream that exited by itself
+	}()
 
 	var merger Merger
 	r := bufio.NewReaderSize(stdout, 1<<20)

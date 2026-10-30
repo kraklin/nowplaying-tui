@@ -94,12 +94,12 @@ func (m Model) info(l layout, accentHex string) string {
 
 	label := "♫  now playing"
 	if app := appName(s.App); app != "" && !s.Empty() {
-		label += "  " + dim2.Render(app)
+		label += "  " + m.th.dim2.Render(app)
 	}
 	title, sub := "nothing playing", ""
 	if !s.Empty() {
 		title = s.Title
-		sub = lipgloss.NewStyle().Bold(true).Render(s.Artist) + dim.Render(" · "+s.Album)
+		sub = lipgloss.NewStyle().Bold(true).Render(s.Artist) + m.th.dim.Render(" · "+s.Album)
 	}
 
 	var elapsed, total int
@@ -114,14 +114,14 @@ func (m Model) info(l layout, accentHex string) string {
 	timeStr := fmtDur(elapsed) + " / " + fmtDur(total)
 
 	lines := []string{
-		dim.Render(label), "",
+		m.th.dim.Render(label), "",
 		line(ac.Render(fit(title, w))),
-		line(truncStyled(sub, s.Artist+" · "+s.Album, w)), "",
-		line(m.bar(ac, frac, w-lipgloss.Width(timeStr)-2) + "  " + dim.Render(timeStr)), "",
+		line(m.truncStyled(sub, s.Artist+" · "+s.Album, w)), "",
+		line(m.bar(ac, frac, w-lipgloss.Width(timeStr)-2) + "  " + m.th.dim.Render(timeStr)), "",
 		line(m.transport(ac, w)), "",
 	}
 	if l.histRows > 0 {
-		lines = append(lines, dim.Render("recently played"))
+		lines = append(lines, m.th.dim.Render("recently played"))
 		lines = append(lines, m.historyRows(l.histRows, w)...)
 	} else {
 		lines = lines[:len(lines)-1]
@@ -130,11 +130,11 @@ func (m Model) info(l layout, accentHex string) string {
 }
 
 // truncStyled returns styled when plain fits in w, otherwise a truncated dim version.
-func truncStyled(styled, plain string, w int) string {
+func (m Model) truncStyled(styled, plain string, w int) string {
 	if lipgloss.Width(plain) <= w {
 		return styled
 	}
-	return dim.Render(fit(plain, w))
+	return m.th.dim.Render(fit(plain, w))
 }
 
 func (m Model) bar(ac lipgloss.Style, frac float64, w int) string {
@@ -144,9 +144,9 @@ func (m Model) bar(ac lipgloss.Style, frac float64, w int) string {
 	knob := min(int(frac*float64(w-1)), w-1)
 	filled := ac.Render(strings.Repeat("━", knob) + "●")
 	if !m.state.Playing {
-		filled = dim.Render(strings.Repeat("━", knob) + "●")
+		filled = m.th.dim.Render(strings.Repeat("━", knob) + "●")
 	}
-	return filled + dim2.Render(strings.Repeat("─", w-knob-1))
+	return filled + m.th.dim2.Render(strings.Repeat("─", w-knob-1))
 }
 
 func (m Model) transport(ac lipgloss.Style, w int) string {
@@ -155,11 +155,11 @@ func (m Model) transport(ac lipgloss.Style, w int) string {
 	if !m.state.Playing {
 		playIcon = ic.play
 	}
-	left := strings.Join([]string{dim2.Render(ic.shuffle), ic.prev, ac.Render(playIcon), ic.next, dim2.Render(ic.repeat)}, "   ")
+	left := strings.Join([]string{m.th.dim2.Render(ic.shuffle), ic.prev, ac.Render(playIcon), ic.next, m.th.dim2.Render(ic.repeat)}, "   ")
 
 	const volW = 10
 	filled := m.volume * volW / 100
-	vol := ic.volume + " " + ac.Render(strings.Repeat("━", filled)) + dim2.Render(strings.Repeat("─", volW-filled))
+	vol := ic.volume + " " + ac.Render(strings.Repeat("━", filled)) + m.th.dim2.Render(strings.Repeat("─", volW-filled))
 	pad := w - lipgloss.Width(left) - lipgloss.Width(vol)
 	if pad < 2 {
 		return left
@@ -173,10 +173,7 @@ func (m Model) historyRows(n, w int) []string {
 	rem := w - 3 - 2 - durW - 2
 	titleW := rem * 11 / 20
 	artistW := rem - titleW
-	bg, bright, soft := [3]uint8{18, 18, 18}, [3]uint8{216, 216, 216}, [3]uint8{138, 138, 138}
-	if !m.opts.Dark {
-		bg, bright, soft = [3]uint8{255, 255, 255}, [3]uint8{34, 34, 34}, [3]uint8{107, 107, 107}
-	}
+	bg, bright, soft := m.th.bg, m.th.bright, m.th.soft
 	for i, e := range m.recent[:n] {
 		f := fade(i)
 		brightSt, softSt := fadedStyle(bright, bg, f), fadedStyle(soft, bg, f)

@@ -32,12 +32,15 @@ func Hash(data []byte) string {
 
 // Options controls the pixel-art look.
 type Options struct {
-	Quantize  int  // k-means palette size, 0 = off
-	Scanlines bool // darken every other pixel row
-	Dark      bool // terminal has a dark background (accent contrast target)
+	Quantize  int        // k-means palette size, 0 = off
+	Scanlines bool       // darken every other pixel row
+	BG        color.RGBA // terminal background the accent must contrast with
 }
 
-func DefaultOptions(dark bool) Options { return Options{Quantize: 12, Scanlines: true, Dark: dark} }
+// DarkBG is the background assumed when the terminal cannot tell us.
+var DarkBG = color.RGBA{18, 18, 18, 255}
+
+func DefaultOptions(bg color.RGBA) Options { return Options{Quantize: 12, Scanlines: true, BG: bg} }
 
 // Build decodes data, centre-crops, downscales to px×px, restyles and renders it.
 func Build(data []byte, px int, o Options) (Result, error) {
@@ -46,7 +49,7 @@ func Build(data []byte, px int, o Options) (Result, error) {
 		return Result{}, err
 	}
 	small := resize(cropSquare(src), px)
-	ac := hexColor(ensureContrast(pickAccent(small), o.Dark))
+	ac := hexColor(ensureContrast(pickAccent(small), o.BG))
 	quantize(small, o.Quantize)
 	if o.Scanlines {
 		scanlines(small)
@@ -156,12 +159,13 @@ func overlay(g func(col, row int) (rune, bool), col, row int) (rune, bool) {
 
 func hexColor(c color.RGBA) string { return fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B) }
 
-// ensureContrast moves c's HSL lightness until it reaches 3:1 against an
-// assumed terminal background (near-black when dark, white otherwise).
-func ensureContrast(c color.RGBA, dark bool) color.RGBA {
-	bg, dir := color.RGBA{18, 18, 18, 255}, 0.02
-	if !dark {
-		bg, dir = color.RGBA{255, 255, 255, 255}, -0.02
+// ensureContrast moves c's HSL lightness until it reaches 3:1 against bg,
+// heading towards whichever of white and black contrasts more with bg.
+func ensureContrast(c, bg color.RGBA) color.RGBA {
+	white, black := color.RGBA{255, 255, 255, 255}, color.RGBA{0, 0, 0, 255}
+	dir := 0.02
+	if contrast(black, bg) > contrast(white, bg) {
+		dir = -0.02
 	}
 	h, s, l := toHSL(c)
 	for i := 0; i < 50 && contrast(c, bg) < 3; i++ {
@@ -170,6 +174,9 @@ func ensureContrast(c color.RGBA, dark bool) color.RGBA {
 	}
 	return c
 }
+
+// Contrast is the WCAG contrast ratio of a and b.
+func Contrast(a, b color.RGBA) float64 { return contrast(a, b) }
 
 func luminance(c color.RGBA) float64 {
 	lin := func(v uint8) float64 {

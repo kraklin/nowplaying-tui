@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -179,5 +181,43 @@ func TestMissingBinary(t *testing.T) {
 	}
 	if err := mc.Control(Cmd{Kind: Next}); err == nil {
 		t.Errorf("control with missing binary should error")
+	}
+}
+
+func countProcs(t *testing.T, marker string) int {
+	t.Helper()
+	out, _ := exec.Command("pgrep", "-f", marker).Output()
+	return len(strings.Fields(string(out)))
+}
+
+// media-control is a wrapper that starts the real adapter as a child; killing
+// only the wrapper would leave the adapter running.
+func TestCancelKillsGrandchildren(t *testing.T) {
+	const marker = "31.337"
+	mc := &MediaControl{Bin: "sh", StreamArgs: []string{"-c", "sleep " + marker + " & wait"}}
+	ctx, cancel := context.WithCancel(context.Background())
+	out := make(chan State, 4)
+	done := make(chan struct{})
+	go func() { mc.Run(ctx, out); close(done) }()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for countProcs(t, marker) == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if countProcs(t, marker) == 0 {
+		t.Fatal("fake grandchild never started")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not return after cancel")
+	}
+	for end := time.Now().Add(3 * time.Second); countProcs(t, marker) > 0 && time.Now().Before(end); {
+		time.Sleep(50 * time.Millisecond)
+	}
+	if n := countProcs(t, marker); n > 0 {
+		exec.Command("pkill", "-f", marker).Run()
+		t.Errorf("%d grandchild process(es) survived cancel", n)
 	}
 }
