@@ -8,7 +8,8 @@ import (
 
 const (
 	gap        = 4
-	marginX    = 6
+	minMarginX = 6
+	maxInfoW   = 64
 	marginY    = 2
 	minInfoW   = 36
 	maxCoverPx = 32
@@ -30,8 +31,11 @@ type layout struct {
 	histRows int
 }
 
+// marginX grows with the pane so wide terminals keep breathing room.
+func marginX(w int) int { return minMarginX + max(0, w-80)/5 }
+
 func (m Model) layout() layout {
-	w, h := max(m.w-2*marginX, 0), max(m.h-2*marginY, 0)
+	w, h := max(m.w-2*marginX(m.w), 0), max(m.h-2*marginY, 0)
 	hist := func(rows int) int { return max(0, min(rows, len(m.recent))) }
 	text := func() layout {
 		return layout{mode: textOnly, infoW: min(max(w, 10), 60), histRows: hist(h - infoLines)}
@@ -45,7 +49,7 @@ func (m Model) layout() layout {
 		if px < 8 {
 			return text()
 		}
-		return layout{mode: sideBySide, coverPx: px, infoW: w - px - gap, histRows: hist(h - infoLines)}
+		return layout{mode: sideBySide, coverPx: px, infoW: min(w-px-gap, maxInfoW), histRows: hist(h - infoLines)}
 	}
 	px := even(min((h-infoLines-1)*2, maxCoverPx, w))
 	if px < 8 {
