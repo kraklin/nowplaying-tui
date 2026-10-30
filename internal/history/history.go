@@ -27,10 +27,12 @@ type entryJSON struct {
 	PlayedAt    time.Time `json:"played_at"`
 }
 
+// MarshalJSON writes the entry with the duration in seconds.
 func (e Entry) MarshalJSON() ([]byte, error) {
 	return json.Marshal(entryJSON{e.Title, e.Artist, e.Album, e.Duration.Seconds(), e.App, e.PlayedAt})
 }
 
+// UnmarshalJSON reads what MarshalJSON wrote.
 func (e *Entry) UnmarshalJSON(b []byte) error {
 	var j entryJSON
 	if err := json.Unmarshal(b, &j); err != nil {

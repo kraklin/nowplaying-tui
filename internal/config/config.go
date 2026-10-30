@@ -15,6 +15,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// Config is the user configuration. Every field has a default; see Default.
 type Config struct {
 	// ShowCover false hides the cover and shows only the text.
 	ShowCover      bool   `toml:"show_cover"`
@@ -36,6 +37,7 @@ type Config struct {
 	Background string `toml:"background"`
 }
 
+// Default returns the configuration used when no file sets a value.
 func Default() Config {
 	return Config{
 		ShowCover:      true,

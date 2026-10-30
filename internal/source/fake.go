@@ -29,6 +29,7 @@ type Fake struct {
 	wake    chan struct{}
 }
 
+// NewFake returns a Fake with its scripted tracks.
 func NewFake() *Fake {
 	f := &Fake{
 		tracks: []fakeTrack{
@@ -81,6 +82,7 @@ func (f *Fake) goTo(i int) {
 	f.elapsed = 0
 }
 
+// Run plays the script into out until ctx is cancelled.
 func (f *Fake) Run(ctx context.Context, out chan<- State) {
 	send := func() bool {
 		f.mu.Lock()
@@ -122,6 +124,7 @@ func (f *Fake) Run(ctx context.Context, out chan<- State) {
 	}
 }
 
+// Control applies a transport command to the scripted player.
 func (f *Fake) Control(c Cmd) error {
 	f.mu.Lock()
 	f.advance(time.Now())

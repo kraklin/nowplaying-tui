@@ -59,6 +59,7 @@ type Store struct {
 	last uint64
 }
 
+// NewStore returns a store that keeps at most max entries in the file at path.
 func NewStore(path string, max int) *Store {
 	if max <= 0 {
 		max = DefaultSize

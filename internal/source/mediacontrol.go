@@ -23,6 +23,7 @@ type MediaControl struct {
 	Backoff    []time.Duration // restart delays; the last one repeats
 }
 
+// NewMediaControl returns a Source that reads and controls macOS through media-control.
 func NewMediaControl() *MediaControl { return &MediaControl{} }
 
 func (m *MediaControl) bin() string {
@@ -53,6 +54,8 @@ func (m *MediaControl) Installed() bool {
 	return err == nil
 }
 
+// Run streams states into out, restarting the stream with a backoff when it
+// dies, until ctx is cancelled.
 func (m *MediaControl) Run(ctx context.Context, out chan<- State) {
 	send := func(s State) bool {
 		select {
@@ -129,6 +132,7 @@ func (m *MediaControl) runOnce(ctx context.Context, last *State, send func(State
 	}
 }
 
+// Control runs a transport command through media-control.
 func (m *MediaControl) Control(c Cmd) error {
 	var args []string
 	switch c.Kind {

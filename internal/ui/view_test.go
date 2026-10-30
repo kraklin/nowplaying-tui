@@ -138,7 +138,7 @@ func TestFadedStyleBlend(t *testing.T) {
 
 func TestArtCacheBySize(t *testing.T) {
 	m := settle(t, 80, 20, false)
-	key80, _ := m.wantArt()
+	key80 := m.wantArt()
 	if _, ok := m.cache[key80]; !ok {
 		t.Fatal("cover for 80x20 should be cached after settling")
 	}

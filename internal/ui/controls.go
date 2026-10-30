@@ -22,31 +22,42 @@ type hit struct {
 	act    action
 }
 
-// transportRow renders the icons and volume bar and reports where they are, so
-// clicks and scrolls land on exactly what was drawn. volX is -1 when the volume
-// bar is not shown.
+// icon is the glyph of a button; the play button shows pause while playing.
+func (m Model) icon(a action) string {
+	switch a {
+	case actPrev:
+		return m.icons.prev
+	case actBack:
+		return m.icons.back
+	case actFwd:
+		return m.icons.fwd
+	case actNext:
+		return m.icons.next
+	}
+	if m.state.Playing {
+		return m.icons.pause
+	}
+	return m.icons.play
+}
+
 // iconRow lays out the given buttons left to right and returns where each can be
 // clicked (one cell of slack either side; the 3-cell gaps keep spans apart).
-func (m Model) iconRow(ac lipgloss.Style, acts []action) (left string, hits []hit, width int) {
-	ic := m.icons
-	playIcon := ic.pause
-	if !m.state.Playing {
-		playIcon = ic.play
-	}
-	all := map[action][2]string{
-		actPrev: {ic.prev, ic.prev}, actBack: {ic.back, ic.back}, actPlay: {ac.Render(playIcon), playIcon},
-		actFwd: {ic.fwd, ic.fwd}, actNext: {ic.next, ic.next},
-	}
+// Only the play button is drawn in the accent colour.
+func (m Model) iconRow(ac lipgloss.Style, acts []action) (row string, hits []hit, width int) {
 	parts := make([]string, len(acts))
 	x := 0
 	for i, a := range acts {
-		parts[i] = all[a][0]
-		w := lipgloss.Width(all[a][1])
+		glyph := m.icon(a)
+		parts[i] = glyph
+		if a == actPlay {
+			parts[i] = ac.Render(glyph)
+		}
+		w := lipgloss.Width(glyph)
 		hits = append(hits, hit{x - 1, x + w + 1, a})
 		x += w + len(iconGap)
 	}
-	left = strings.Join(parts, iconGap)
-	return left, hits, lipgloss.Width(left)
+	row = strings.Join(parts, iconGap)
+	return row, hits, lipgloss.Width(row)
 }
 
 // elapsedSeconds is the interpolated position in whole seconds.
@@ -60,7 +71,7 @@ func (m Model) elapsedSeconds() int {
 // compactControls is the controls row of the compact card: the buttons followed
 // by the time, centred. In a very narrow card it drops the time, then the outer
 // buttons, down to play/pause alone. There is no volume bar.
-func (m Model) compactControls(ac lipgloss.Style, w int) (string, []hit, [2]int) {
+func (m Model) compactControls(ac lipgloss.Style, w int) (string, []hit) {
 	var left string
 	var hits []hit
 	var lw int
@@ -83,13 +94,12 @@ func (m Model) compactControls(ac lipgloss.Style, w int) (string, []hit, [2]int)
 		hits[i].x0 += lead
 		hits[i].x1 += lead
 	}
-	return strings.Repeat(" ", lead) + left + tail, hits, [2]int{-1, -1}
+	return strings.Repeat(" ", lead) + left + tail, hits
 }
 
 func (m Model) transportRow(ac lipgloss.Style, w int) (row string, hits []hit) {
 	if m.layout().compact {
-		row, hits, _ := m.compactControls(ac, w)
-		return row, hits
+		return m.compactControls(ac, w)
 	}
 	left, hits, _ := m.iconRow(ac, []action{actPrev, actBack, actPlay, actFwd, actNext})
 	// The icons are centred, or left-aligned beside a cover.
@@ -102,4 +112,11 @@ func (m Model) transportRow(ac lipgloss.Style, w int) (row string, hits []hit) {
 		hits[i].x1 += lead
 	}
 	return strings.Repeat(" ", lead) + left, hits
+}
+
+// transportHits are the clickable spans of the transport row. They do not depend
+// on colours, so no style is needed.
+func (m Model) transportHits(w int) []hit {
+	_, hits := m.transportRow(lipgloss.NewStyle(), w)
+	return hits
 }

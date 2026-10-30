@@ -22,8 +22,10 @@ var ErrUnavailable = errors.New("system volume unavailable")
 // Runner executes one AppleScript line and returns its output.
 type Runner func(ctx context.Context, script string) ([]byte, error)
 
+// Osascript reads and sets the macOS output volume and mute switch with osascript.
 type Osascript struct{ run Runner }
 
+// New returns an Osascript backed by the real osascript command.
 func New() *Osascript { return &Osascript{run: osascript} }
 
 // Available reports whether osascript is on PATH.
@@ -89,20 +91,24 @@ type Fake struct {
 	Muted bool
 }
 
+// NewFake returns a Fake at the given level.
 func NewFake(level int) *Fake { return &Fake{Level: level} }
 
+// Get returns the level.
 func (f *Fake) Get() (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.Level, nil
 }
 
+// Read returns the level and the mute state.
 func (f *Fake) Read() (int, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.Level, f.Muted, nil
 }
 
+// Set sets the level.
 func (f *Fake) Set(v int) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -110,6 +116,7 @@ func (f *Fake) Set(v int) error {
 	return nil
 }
 
+// SetMuted sets the mute state.
 func (f *Fake) SetMuted(m bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

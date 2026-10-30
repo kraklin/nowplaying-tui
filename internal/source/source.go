@@ -1,7 +1,10 @@
+// Package source reports what the system is playing and runs transport
+// commands: the media-control stream parser and a scripted fake for --demo.
 package source
 
 import "context"
 
+// CmdKind is the kind of transport command.
 type CmdKind int
 
 const (

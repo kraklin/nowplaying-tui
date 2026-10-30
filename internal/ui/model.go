@@ -1,3 +1,4 @@
+// Package ui is the Bubble Tea model, layout and drawing of the now-playing card.
 package ui
 
 import (
@@ -12,8 +13,6 @@ import (
 	"github.com/tomaslatall/nowplaying-tui/internal/history"
 	"github.com/tomaslatall/nowplaying-tui/internal/source"
 )
-
-var sprintf = fmt.Sprintf
 
 // StateMsg carries a new source state.
 type StateMsg source.State
@@ -101,6 +100,8 @@ type Deps struct {
 	Warnings []string
 }
 
+// Model is the Bubble Tea model of the card. Everything slow runs in a tea.Cmd;
+// Update and View only touch memory.
 type Model struct {
 	src     <-chan source.State
 	deps    Deps
@@ -166,12 +167,13 @@ func New(states <-chan source.State, recent []history.Entry, bg color.RGBA, deps
 	if len(deps.Warnings) > 0 {
 		m.setNoteFor(deps.Warnings[0], warnFor)
 		if n := len(deps.Warnings) - 1; n > 0 {
-			m.noteTail = sprintf(" (+%d more)", n)
+			m.noteTail = fmt.Sprintf(" (+%d more)", n)
 		}
 	}
 	return m
 }
 
+// Init starts the state stream, the progress tick and the volume poll.
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(waitState(m.src), tick(), m.pollVolume())
 }
@@ -201,14 +203,12 @@ func waitState(ch <-chan source.State) tea.Cmd {
 
 func renderArt(key artKey, data []byte, opts art.Options) tea.Cmd {
 	return func() tea.Msg {
-		var res art.Result
-		if key.hash == placeholderHash {
-			res = art.Placeholder(key.px, opts.BG, opts.Accent)
-		} else if r, err := art.Build(data, key.px, opts); err == nil {
-			res = r
-		} else {
-			res = art.Placeholder(key.px, opts.BG, opts.Accent)
+		if key.hash != placeholderHash {
+			if res, err := art.Build(data, key.px, opts); err == nil {
+				return ArtMsg{Hash: key.hash, Px: key.px, Result: res}
+			}
 		}
+		res := art.Placeholder(key.px, opts.BG, opts.Accent)
 		return ArtMsg{Hash: key.hash, Px: key.px, Result: res}
 	}
 }
@@ -219,7 +219,7 @@ const accentPx = 16
 
 // wantArt returns the cache key for the cover the current state and layout need.
 // Without a visible cover it is a small one, so the accent still follows the music.
-func (m Model) wantArt() (artKey, bool) {
+func (m Model) wantArt() artKey {
 	px := m.layout().coverPx
 	if px == 0 {
 		px = accentPx
@@ -228,14 +228,11 @@ func (m Model) wantArt() (artKey, bool) {
 	if !m.state.Empty() && len(m.state.Art) > 0 {
 		hash = art.Hash(m.state.Art)
 	}
-	return artKey{hash, px}, true
+	return artKey{hash, px}
 }
 
 func (m *Model) ensureArt() tea.Cmd {
-	key, ok := m.wantArt()
-	if !ok {
-		return nil
-	}
+	key := m.wantArt()
 	if _, cached := m.cache[key]; cached || m.pending[key] {
 		return nil
 	}
@@ -243,20 +240,15 @@ func (m *Model) ensureArt() tea.Cmd {
 	return renderArt(key, m.state.Art, m.opts)
 }
 
+// Update handles one message: a source state, a timer, a finished background
+// job, a key or the mouse.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		return m, m.ensureArt()
 	case StateMsg:
-		m.state = source.State(msg)
-		m.now = m.clock()
-		cmds := []tea.Cmd{waitState(m.src), m.ensureArt()}
-		if e := m.tracker.Observe(m.state, m.now); e != nil {
-			m.recent = history.Push(m.recent, *e, m.histMax)
-			cmds = append(cmds, m.saveHistory())
-		}
-		return m, tea.Batch(cmds...)
+		return m.onState(source.State(msg))
 	case HistorySavedMsg:
 		if msg.Err != nil {
 			m.setNote("history not saved")
@@ -277,27 +269,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tick()
 	case VolumeMsg:
-		next := tea.Tick(volPollEvery, func(time.Time) tea.Msg { return volPollMsg{} })
-		switch {
-		case msg.Err != nil:
-			m.volume, m.muted = -1, false
-		case !m.volBusy && !m.clock().Before(m.volHold):
-			m.volume, m.muted = msg.Level, msg.Muted
-		}
-		return m, next
+		return m.onVolume(msg)
 	case volPollMsg:
 		return m, m.pollVolume()
 	case volSetMsg:
-		m.volBusy = false
-		if msg.err != nil {
-			m.setNote("volume failed")
-			return m, m.pollVolume()
-		}
-		if m.volume != msg.level || m.muted != msg.muted { // keys were pressed while the last write ran
-			m.volBusy = true
-			return m, setVolume(m.deps.Volume, m.volume, m.muted)
-		}
-		return m, nil
+		return m.onVolumeWritten(msg)
 	case ControlErrMsg:
 		m.setNote(msg.Op + " failed")
 		return m, nil
@@ -305,6 +281,46 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.key(msg)
 	case tea.MouseMsg:
 		return m.mouse(msg)
+	}
+	return m, nil
+}
+
+// onState takes a new player state: it keeps the stream going, makes sure the
+// cover is rendered and records the previous track in the history when it counts.
+func (m Model) onState(st source.State) (tea.Model, tea.Cmd) {
+	m.state = st
+	m.now = m.clock()
+	cmds := []tea.Cmd{waitState(m.src), m.ensureArt()}
+	if e := m.tracker.Observe(m.state, m.now); e != nil {
+		m.recent = history.Push(m.recent, *e, m.histMax)
+		cmds = append(cmds, m.saveHistory())
+	}
+	return m, tea.Batch(cmds...)
+}
+
+// onVolume takes a volume reading. It is ignored while a write is running or
+// just finished, so the bar does not jump back to a stale value.
+func (m Model) onVolume(msg VolumeMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case msg.Err != nil:
+		m.volume, m.muted = -1, false
+	case !m.volBusy && !m.clock().Before(m.volHold):
+		m.volume, m.muted = msg.Level, msg.Muted
+	}
+	return m, tea.Tick(volPollEvery, func(time.Time) tea.Msg { return volPollMsg{} })
+}
+
+// onVolumeWritten finishes a volume write, and sends the latest wanted state if
+// keys were pressed while it ran.
+func (m Model) onVolumeWritten(msg volSetMsg) (tea.Model, tea.Cmd) {
+	m.volBusy = false
+	if msg.err != nil {
+		m.setNote("volume failed")
+		return m, m.pollVolume()
+	}
+	if m.volume != msg.level || m.muted != msg.muted {
+		m.volBusy = true
+		return m, setVolume(m.deps.Volume, m.volume, m.muted)
 	}
 	return m, nil
 }
@@ -382,6 +398,10 @@ func (m Model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) togglePlay() tea.Cmd { return m.send("play/pause", source.Cmd{Kind: source.TogglePlay}) }
+func (m Model) next() tea.Cmd       { return m.send("next", source.Cmd{Kind: source.Next}) }
+func (m Model) previous() tea.Cmd   { return m.send("previous", source.Cmd{Kind: source.Previous}) }
+
 // send runs a transport command off the UI loop. The stream reports the
 // resulting state, so the model never guesses it.
 func (m Model) send(op string, c source.Cmd) tea.Cmd {
@@ -428,43 +448,54 @@ func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	_, g := m.compose()
-	if (msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown) &&
-		g.volRow >= 0 && msg.Y == g.volRow && msg.X >= g.volX0 && msg.X < g.volX1 {
-		if msg.Button == tea.MouseButtonWheelUp {
-			return m.changeVolume(volStep)
-		}
-		return m.changeVolume(-volStep)
+	switch msg.Button {
+	case tea.MouseButtonWheelUp, tea.MouseButtonWheelDown:
+		return m.scroll(msg, g)
+	case tea.MouseButtonLeft:
+		return m.click(msg, g)
 	}
+	return m, nil
+}
+
+// scroll changes the volume when the wheel turns over the volume bar.
+func (m Model) scroll(msg tea.MouseMsg, g geom) (tea.Model, tea.Cmd) {
+	if g.volRow < 0 || msg.Y != g.volRow || msg.X < g.volX0 || msg.X >= g.volX1 {
+		return m, nil
+	}
+	if msg.Button == tea.MouseButtonWheelUp {
+		return m.changeVolume(volStep)
+	}
+	return m.changeVolume(-volStep)
+}
+
+// click seeks when the progress bar is hit and runs the button under the cursor.
+func (m Model) click(msg tea.MouseMsg, g geom) (tea.Model, tea.Cmd) {
 	row, col := msg.Y-g.infoY, msg.X-g.infoX
 	if col < 0 || col >= g.infoW {
 		return m, nil
 	}
-	_, hits := m.transportRow(accentStyle("#000000"), g.infoW)
-	switch msg.Button {
-	case tea.MouseButtonLeft:
-		switch {
-		case row == g.progRow && g.progRow >= 0:
-			if bw := m.barWidth(g.infoW); bw > 1 && col < bw && !m.state.Empty() {
-				frac := float64(col) / float64(bw-1)
-				return m.seekTarget(time.Duration(frac * float64(m.state.Duration)))
+	switch row {
+	case g.progRow:
+		if bw := m.barWidth(g.infoW); g.progRow >= 0 && bw > 1 && col < bw && !m.state.Empty() {
+			frac := float64(col) / float64(bw-1)
+			return m.seekTarget(time.Duration(frac * float64(m.state.Duration)))
+		}
+	case g.ctrlRow:
+		for _, h := range m.transportHits(g.infoW) {
+			if col < h.x0 || col >= h.x1 {
+				continue
 			}
-		case row == g.ctrlRow:
-			for _, h := range hits {
-				if col < h.x0 || col >= h.x1 {
-					continue
-				}
-				switch h.act {
-				case actPrev:
-					return m, m.send("previous", source.Cmd{Kind: source.Previous})
-				case actNext:
-					return m, m.send("next", source.Cmd{Kind: source.Next})
-				case actPlay:
-					return m, m.send("play/pause", source.Cmd{Kind: source.TogglePlay})
-				case actBack:
-					return m.seek(-seekStep) // same as the left arrow
-				case actFwd:
-					return m.seek(seekStep)
-				}
+			switch h.act {
+			case actPrev:
+				return m, m.previous()
+			case actNext:
+				return m, m.next()
+			case actPlay:
+				return m, m.togglePlay()
+			case actBack:
+				return m.seek(-seekStep) // same as the left arrow
+			case actFwd:
+				return m.seek(seekStep)
 			}
 		}
 	}

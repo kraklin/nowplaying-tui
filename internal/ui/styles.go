@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"math"
 	"regexp"
 	"strings"
@@ -66,9 +67,9 @@ func fmtDur(secs int) string {
 	}
 	h, m, s := secs/3600, secs/60%60, secs%60
 	if h > 0 {
-		return sprintf("%d:%02d:%02d", h, m, s)
+		return fmt.Sprintf("%d:%02d:%02d", h, m, s)
 	}
-	return sprintf("%d:%02d", m, s)
+	return fmt.Sprintf("%d:%02d", m, s)
 }
 
 // fade is the visibility of history row i: 1 for the newest, decaying

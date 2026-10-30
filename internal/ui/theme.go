@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"image/color"
 
 	"github.com/charmbracelet/lipgloss"
@@ -44,5 +45,5 @@ func mix(a, b [3]uint8, f float64) [3]uint8 {
 }
 
 func colorStyle(c [3]uint8) lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(sprintf("#%02x%02x%02x", c[0], c[1], c[2])))
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(fmt.Sprintf("#%02x%02x%02x", c[0], c[1], c[2])))
 }

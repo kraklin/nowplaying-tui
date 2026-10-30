@@ -27,9 +27,12 @@ const (
 	volTrackW = 10 // cells in the volume bar, after the icon and a space
 	iconGap   = "   "
 
+	defaultAccent = "#c9a7ff" // until a cover has been read, and for the install hint
+
 	helpText = "space play · n/p skip · ←/→ seek · +/- vol · m mute · a art · s src · r hist · c clear · q quit"
 )
 
+// View draws the card, or the install hint when media-control is missing.
 func (m Model) View() string {
 	if m.w == 0 || m.h == 0 {
 		return ""
@@ -41,30 +44,32 @@ func (m Model) View() string {
 	return strings.Join(rows, "\n")
 }
 
-// compose lays the card out on a w×h grid. It places everything with explicit
-// coordinates (no Place/Join rounding), so View and the mouse handler agree.
-func (m Model) compose() ([]string, geom) {
-	l := m.layout()
-	accent := "#c9a7ff"
-	var cover []string
-	if key, ok := m.wantArt(); ok {
-		r, cached := m.cache[key]
-		switch {
-		case cached:
-			accent = r.Accent
-			if l.coverPx > 0 {
-				cover = strings.Split(r.Rendered, "\n")
-			}
-		case l.coverPx > 0: // not rendered yet: keep the space
-			cover = make([]string, l.coverPx/2)
-			for i := range cover {
-				cover[i] = strings.Repeat(" ", l.coverPx)
-			}
+// coverBlock returns the cover's lines and the accent colour to draw with: the
+// configured one, else the one picked from the artwork, else the default.
+func (m Model) coverBlock(l layout) (cover []string, accent string) {
+	accent = defaultAccent
+	if r, cached := m.cache[m.wantArt()]; cached {
+		accent = r.Accent
+		if l.coverPx > 0 {
+			cover = strings.Split(r.Rendered, "\n")
+		}
+	} else if l.coverPx > 0 { // not rendered yet: keep the space
+		cover = make([]string, l.coverPx/2)
+		for i := range cover {
+			cover[i] = strings.Repeat(" ", l.coverPx)
 		}
 	}
 	if m.cfg.Accent != "" {
 		accent = m.cfg.Accent
 	}
+	return cover, accent
+}
+
+// compose lays the card out on a w×h grid. It places everything with explicit
+// coordinates (no Place/Join rounding), so View and the mouse handler agree.
+func (m Model) compose() ([]string, geom) {
+	l := m.layout()
+	cover, accent := m.coverBlock(l)
 	ac := accentStyle(accent)
 	info := strings.Split(m.info(l, accent), "\n")
 
@@ -114,7 +119,7 @@ func (m Model) compose() ([]string, geom) {
 // missingView is shown when media-control is not installed.
 func (m Model) missingView() string {
 	bold := lipgloss.NewStyle().Bold(true)
-	accent := accentStyle("#c9a7ff")
+	accent := accentStyle(defaultAccent)
 	if m.cfg.Accent != "" {
 		accent = accentStyle(m.cfg.Accent)
 	}
@@ -169,11 +174,7 @@ func (m Model) info(l layout, accentHex string) string {
 		sub = lipgloss.NewStyle().Bold(true).Render(s.Artist) + m.th.dim.Render(" · "+s.Album)
 	}
 
-	var elapsed int
-	if !s.Empty() {
-		elapsed = int(s.Position(m.now).Seconds())
-	}
-	progress := m.progress(ac, w, elapsed)
+	progress := m.progress(ac, w, m.elapsedSeconds())
 	transport, _ := m.transportRow(ac, w)
 
 	lines := []string{
@@ -199,11 +200,7 @@ func (m Model) barWidth(w int) int {
 	if !s.Empty() && s.Duration <= 0 {
 		return 0
 	}
-	elapsed := 0
-	if !s.Empty() {
-		elapsed = int(s.Position(m.now).Seconds())
-	}
-	return max(w-lipgloss.Width(timeLabel(elapsed, int(s.Duration.Seconds())))-2, 0)
+	return max(w-lipgloss.Width(timeLabel(m.elapsedSeconds(), int(s.Duration.Seconds())))-2, 0)
 }
 
 // progress is the bar with m:ss / m:ss, or only the elapsed time for streams
@@ -268,7 +265,7 @@ func (m Model) compactInfo(l layout, ac lipgloss.Style) string {
 	if m.note != "" {
 		subRow = centerIn(m.th.dim.Render(strings.TrimRight(fit(m.note, w), " ")), w)
 	}
-	controls, _, _ := m.compactControls(ac, w)
+	controls, _ := m.compactControls(ac, w)
 	switch {
 	case m.h >= 3:
 		return strings.Join([]string{line(titleRow), line(subRow), line(controls)}, "\n")

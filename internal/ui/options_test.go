@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -83,7 +84,7 @@ func TestAccentStillFollowsTheCoverWhenItIsHidden(t *testing.T) {
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	defer lipgloss.SetColorProfile(termenv.Ascii)
 	hidden := settleFull(t, 100, 30, false, art.DarkBG, cfgWith(func(c *config.Config) { c.ShowCover = false }))
-	key, _ := hidden.wantArt()
+	key := hidden.wantArt()
 	res, ok := hidden.cache[key]
 	if !ok {
 		t.Fatal("the small cover for the accent was never built")
@@ -92,11 +93,11 @@ func TestAccentStillFollowsTheCoverWhenItIsHidden(t *testing.T) {
 		t.Fatalf("accent is still the default %s; it should come from the track", res.Accent)
 	}
 	c, _ := config.ParseHex(res.Accent)
-	if want := sprintf("38;2;%d;%d;%d", c.R, c.G, c.B); !strings.Contains(hidden.View(), want) {
+	if want := fmt.Sprintf("38;2;%d;%d;%d", c.R, c.G, c.B); !strings.Contains(hidden.View(), want) {
 		t.Errorf("the card should be drawn in the picked accent %s", res.Accent)
 	}
 	shown := settleFull(t, 100, 30, false, art.DarkBG, nil)
-	if k, _ := shown.wantArt(); shown.cache[k].Accent != res.Accent {
+	if k := shown.wantArt(); shown.cache[k].Accent != res.Accent {
 		t.Errorf("the accent should not depend on whether the cover is visible: %s vs %s", shown.cache[k].Accent, res.Accent)
 	}
 }
@@ -106,7 +107,7 @@ func TestAccentStillFollowsTheCoverInATinyPane(t *testing.T) {
 	if m.layout().coverPx != 0 {
 		t.Fatal("setup: this pane should have no cover")
 	}
-	key, _ := m.wantArt()
+	key := m.wantArt()
 	if res, ok := m.cache[key]; !ok || res.Accent == placeholderAccentHex {
 		t.Errorf("a small pane keeps the track's accent too: %+v ok=%v", res.Accent, ok)
 	}
@@ -480,7 +481,7 @@ func TestHistoryKeyRendersTheCoverItResizes(t *testing.T) {
 	if after == before {
 		t.Skipf("setup: hiding the history did not change the cover (%dpx)", before)
 	}
-	key, _ := hidden.wantArt()
+	key := hidden.wantArt()
 	if _, cached := hidden.cache[key]; cached {
 		t.Skip("setup: the new size was already cached")
 	}
@@ -574,10 +575,10 @@ func TestHidingTheCoverKeepsTheAccent(t *testing.T) {
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	defer lipgloss.SetColorProfile(termenv.Ascii)
 	m := settle(t, 100, 30, false)
-	key, _ := m.wantArt()
+	key := m.wantArt()
 	accent := m.cache[key].Accent
 	c, _ := config.ParseHex(accent)
-	want := sprintf("38;2;%d;%d;%d", c.R, c.G, c.B)
+	want := fmt.Sprintf("38;2;%d;%d;%d", c.R, c.G, c.B)
 	hidden, cmd := press(t, m, "a")
 	hidden = finish(t, hidden, cmd)
 	if !strings.Contains(hidden.View(), want) {

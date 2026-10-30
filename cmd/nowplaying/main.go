@@ -1,3 +1,4 @@
+// Command nowplaying is a pixel-art now-playing card for the terminal (macOS).
 package main
 
 import (
@@ -35,7 +36,10 @@ func versionString() string {
 	return "dev"
 }
 
-func main() {
+func main() { os.Exit(run()) }
+
+// run is main with an exit code, so deferred cleanup runs before the exit.
+func run() int {
 	demo := flag.Bool("demo", false, "run with scripted fake data")
 	bgFlag := flag.String("background", "", "terminal background colour as #rrggbb (default: config, then ask the terminal)")
 	cfgFlag := flag.String("config", "", "config file (default: $XDG_CONFIG_HOME/nowplaying/config.toml)")
@@ -43,7 +47,7 @@ func main() {
 	flag.Parse()
 	if *showVersion {
 		fmt.Println("nowplaying", versionString())
-		return
+		return 0
 	}
 
 	cfg, warnings := loadConfig(*cfgFlag)
@@ -54,7 +58,7 @@ func main() {
 	bg, err := background(*bgFlag, cfg.Background)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "nowplaying:", err)
-		os.Exit(2)
+		return 2
 	}
 
 	// SIGHUP is what a closed terminal or tuios pane sends; Go's default would
@@ -62,32 +66,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGHUP)
 	defer cancel()
 
-	// Without media-control the source reports it and the UI shows the install hint.
-	var src source.Source = source.NewFake()
-	recent := history.Demo()
-	if !*demo {
-		src, recent = source.NewMediaControl(), nil // recent is loaded from disk below
-	}
-	deps := ui.Deps{Control: src.Control, Config: &cfg, Warnings: warnings}
-	if *demo {
-		deps.Volume = volume.NewFake(55)
-	} else {
-		if volume.Available() {
-			deps.Volume = volume.New()
-		}
-		if path, err := history.DefaultPath(); err == nil {
-			deps.History = history.NewStore(path, cfg.HistorySize)
-			if legacy, err := history.LegacyPath(); err == nil {
-				deps.History.Legacy = legacy
-			}
-			var lerr error
-			if recent, lerr = deps.History.Load(); lerr != nil {
-				fmt.Fprintln(os.Stderr, "nowplaying:", lerr)
-				deps.Warnings = append(deps.Warnings, "history was unreadable; started empty")
-			}
-		}
-	}
-
+	src, deps, recent := wire(*demo, cfg, warnings)
 	states := make(chan source.State, 1)
 	stopped := make(chan struct{})
 	go func() {
@@ -110,8 +89,41 @@ func main() {
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "nowplaying:", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
+}
+
+// wire picks the source, volume control and history store: scripted fakes for
+// --demo, the real macOS ones otherwise. Without media-control the source
+// reports it and the UI shows the install hint.
+func wire(demo bool, cfg config.Config, warnings []string) (source.Source, ui.Deps, []history.Entry) {
+	deps := ui.Deps{Config: &cfg, Warnings: warnings}
+	if demo {
+		src := source.NewFake()
+		deps.Control, deps.Volume = src.Control, volume.NewFake(55)
+		return src, deps, history.Demo()
+	}
+	src := source.NewMediaControl()
+	deps.Control = src.Control
+	if volume.Available() {
+		deps.Volume = volume.New()
+	}
+	path, err := history.DefaultPath()
+	if err != nil {
+		return src, deps, nil
+	}
+	store := history.NewStore(path, cfg.HistorySize)
+	if legacy, err := history.LegacyPath(); err == nil {
+		store.Legacy = legacy
+	}
+	deps.History = store
+	recent, err := store.Load()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "nowplaying:", err)
+		deps.Warnings = append(deps.Warnings, "history was unreadable; started empty")
+	}
+	return src, deps, recent
 }
 
 // loadConfig reads the file named by --config, or the default location. A

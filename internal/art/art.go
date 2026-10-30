@@ -28,6 +28,7 @@ const (
 	accentSample      = 32 // px the cover is downscaled to for picking the accent
 )
 
+// Hash is a short, stable identifier of an image, used as a cache key.
 func Hash(data []byte) string {
 	sum := sha1.Sum(data)
 	return hex.EncodeToString(sum[:8])
@@ -44,6 +45,7 @@ type Options struct {
 // DarkBG is the background assumed when the terminal cannot tell us.
 var DarkBG = color.RGBA{18, 18, 18, 255}
 
+// DefaultOptions are the stylised defaults for a terminal with background bg.
 func DefaultOptions(bg color.RGBA) Options { return Options{Quantize: 12, Scanlines: true, BG: bg} }
 
 // Build decodes data, centre-crops, downscales to px×px, restyles and renders it.

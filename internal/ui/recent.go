@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/tomaslatall/nowplaying-tui/internal/config"
@@ -24,7 +25,7 @@ func (m Model) historyRows(n, w int, accentHex string) []string {
 		}
 		brightSt, softSt := fadedStyle(bright, bg, f), fadedStyle(soft, bg, f)
 		dur := fmtDur(int(e.Duration.Seconds()))
-		row := softSt.Render(sprintf("%-2d", i+1)) + " " +
+		row := softSt.Render(fmt.Sprintf("%-2d", i+1)) + " " +
 			brightSt.Render(fit(e.Title, titleW)) + " " +
 			softSt.Render(fit(e.Artist, artistW)) + " " +
 			softSt.Render(strings.Repeat(" ", durW-len(dur))+dur)
