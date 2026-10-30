@@ -100,10 +100,11 @@ Side margins grow with the pane so wide terminals keep breathing room. The info
 column is at least 36 and at most 64 cells wide. Long titles are cut with `…`,
 never wrapped.
 
-The title, artist line and control icons are always centred; the progress bar and the
-history list keep the full width. The volume bar stays at the right edge of the
-controls row, and in a narrow card the icons move left just far enough to keep two
-cells clear of it.
+Beside the cover the title, artist line and control icons are left-aligned with the
+progress bar; under the cover, or in the text-only card, they are centred. The progress
+bar and the history list always keep the full width. The volume bar stays at the right edge of the
+controls row, and when the icons are centred in a narrow card they move left just far
+enough to keep two cells clear of it.
 
 The name of the source (Spotify, Firefox, …) sits in the bottom right corner of the
 pane, and is not shown when nothing is playing. Notes (like `next failed`) and the key

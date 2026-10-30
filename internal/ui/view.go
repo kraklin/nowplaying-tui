@@ -303,8 +303,12 @@ func (m Model) info(l layout, accentHex string) string {
 	ac := accentStyle(accentHex)
 	s := m.state
 	line := func(x string) string { return lipgloss.NewStyle().Width(w).Render(x) }
-	// Text is always centred; the bar and the history keep the full width.
+	// Beside a cover the text is left-aligned; under it, or alone, it is centred.
+	// The bar and the history always keep the full width.
 	align := func(x string) string { return centerIn(x, w) }
+	if l.mode == sideBySide {
+		align = func(x string) string { return x }
+	}
 
 	title, sub := "nothing playing", ""
 	if !s.Empty() {
@@ -514,8 +518,12 @@ func (m Model) transportRow(ac lipgloss.Style, w int) (row string, hits []hit, v
 	left, hits, _ := m.iconRow(ac, []action{actPrev, actBack, actPlay, actFwd, actNext})
 	lw := lipgloss.Width(left)
 
-	// The icons are centred; the volume bar stays at the right edge.
+	// The icons are centred (left-aligned beside a cover); the volume bar stays
+	// at the right edge.
 	lead := max((w-lw)/2, 0)
+	if m.layout().mode == sideBySide {
+		lead = 0
+	}
 
 	// While muted the word "mute" replaces the bar, padded to the same width so
 	// nothing in the row moves and the scroll region stays where it was.

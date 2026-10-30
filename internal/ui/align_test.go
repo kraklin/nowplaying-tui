@@ -130,25 +130,22 @@ func TestStackedIconsNeverCrowdTheVolumeBar(t *testing.T) {
 	}
 }
 
-// Text is centred in every layout, beside the cover included.
-func TestSideBySideTextIsCentredInItsColumn(t *testing.T) {
+// Beside the cover the text and the icons start at the left edge of the column.
+func TestSideBySideTextIsLeftAligned(t *testing.T) {
 	for _, sz := range [][2]int{{80, 20}, {100, 30}, {120, 30}, {200, 50}} {
 		h, g := stackedHarness(playing(0, 200*time.Second), sz[0], sz[1], Deps{Volume: &fakeVol{}})
 		if h.m.layout().mode != sideBySide {
 			t.Fatalf("%v should be side by side", sz)
 		}
 		for name, row := range map[string]int{"title": 0, "artist and album": 1} {
-			if l, r := margins(t, h, g, row); !near(l, r) || l == 0 {
+			if l, r := margins(t, h, g, row); l != 0 || r == 0 {
 				t.Errorf("%v: %s has %d empty cells left and %d right", sz, name, l, r)
 			}
 		}
-		if g.infoW >= centringNeedsAtLeast {
-			ic := h.m.icons
-			row := h.rows()[g.infoY+rowTransport]
-			first, last := cellX(row, ic.prev), cellX(row, ic.next)+lipgloss.Width(ic.next)
-			if mid, want := (first+last)/2, g.infoX+g.infoW/2; !near(mid, want) {
-				t.Errorf("%v: icons centred on %d, column centre %d", sz, mid, want)
-			}
+		ic := h.m.icons
+		row := h.rows()[g.infoY+rowTransport]
+		if first := cellX(row, ic.prev); first != g.infoX {
+			t.Errorf("%v: first icon at %d, column starts at %d", sz, first, g.infoX)
 		}
 	}
 }
@@ -378,12 +375,17 @@ func TestScrollOverVolumeInStackedLayout(t *testing.T) {
 	}
 }
 
-func TestResizingAcrossTheStackingBoundaryKeepsTheTextCentred(t *testing.T) {
+func TestResizingAcrossTheStackingBoundaryFollowsTheLayout(t *testing.T) {
 	h := newHarness(playing(0, 200*time.Second), Deps{}).withDemoHistory()
 	for _, sz := range [][2]int{{80, 20}, {80, 50}, {80, 20}, {60, 30}} {
 		h.resize(sz[0], sz[1])
 		_, g := h.m.compose()
-		if l, r := margins(t, h, g, 0); !near(l, r) || l == 0 {
+		l, r := margins(t, h, g, 0)
+		if h.m.layout().mode == sideBySide {
+			if l != 0 {
+				t.Errorf("%v: the title should start at the left edge: %d / %d", sz, l, r)
+			}
+		} else if !near(l, r) || l == 0 {
 			t.Errorf("%v: the title should be centred: %d / %d", sz, l, r)
 		}
 	}
