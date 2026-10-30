@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/tomaslatall/nowplaying-tui/internal/config"
 	"github.com/tomaslatall/nowplaying-tui/internal/source"
 )
 
@@ -326,7 +327,7 @@ func (m Model) info(l layout, accentHex string) string {
 	}
 	if l.histRows > 0 {
 		lines = append(lines, m.th.dim.Render("recently played"))
-		lines = append(lines, m.historyRows(l.histRows, w)...)
+		lines = append(lines, m.historyRows(l.histRows, w, accentHex)...)
 	} else {
 		lines = lines[:len(lines)-1]
 	}
@@ -541,13 +542,17 @@ func (m Model) transportRow(ac lipgloss.Style, w int) (row string, hits []hit, v
 	return strings.Repeat(" ", lead) + left + strings.Repeat(" ", gapMid) + volume, hits, [2]int{w - vw, w}
 }
 
-func (m Model) historyRows(n, w int) []string {
+func (m Model) historyRows(n, w int, accentHex string) []string {
 	const durW = 5
 	rows := make([]string, 0, n)
 	rem := w - 3 - 2 - durW - 2
 	titleW := rem * 11 / 20
 	artistW := rem - titleW
 	bg, bright, soft := m.th.bg, m.th.bright, m.th.soft
+	if ac, err := config.ParseHex(accentHex); err == nil { // lean towards the accent
+		a := [3]uint8{ac.R, ac.G, ac.B}
+		bright, soft = mix(bright, a, 0.25), mix(soft, a, 0.40)
+	}
 	for i, e := range m.recent[:n] {
 		f := fade(i)
 		if !m.cfg.HistoryFade {

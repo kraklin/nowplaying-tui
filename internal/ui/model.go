@@ -143,7 +143,7 @@ func New(states <-chan source.State, recent []history.Entry, bg color.RGBA, deps
 		cfg = *deps.Config
 	}
 	opts := art.DefaultOptions(bg)
-	opts.Quantize, opts.Scanlines = cfg.QuantizeColors, cfg.Scanlines
+	opts.Quantize, opts.Scanlines, opts.Accent = cfg.QuantizeColors, cfg.Scanlines, cfg.Accent
 	m := Model{
 		cfg:         cfg,
 		showHistory: cfg.ShowHistory,
@@ -203,11 +203,11 @@ func renderArt(key artKey, data []byte, opts art.Options) tea.Cmd {
 	return func() tea.Msg {
 		var res art.Result
 		if key.hash == placeholderHash {
-			res = art.Placeholder(key.px)
+			res = art.Placeholder(key.px, opts.BG, opts.Accent)
 		} else if r, err := art.Build(data, key.px, opts); err == nil {
 			res = r
 		} else {
-			res = art.Placeholder(key.px)
+			res = art.Placeholder(key.px, opts.BG, opts.Accent)
 		}
 		return ArtMsg{Hash: key.hash, Px: key.px, Result: res}
 	}

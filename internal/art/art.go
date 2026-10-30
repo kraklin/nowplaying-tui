@@ -38,6 +38,7 @@ type Options struct {
 	Quantize  int        // k-means palette size, 0 = off
 	Scanlines bool       // darken every other pixel row
 	BG        color.RGBA // terminal background the accent must contrast with
+	Accent    string     // "#rrggbb" tint of the empty cover; "" = the default
 }
 
 // DarkBG is the background assumed when the terminal cannot tell us.
@@ -64,20 +65,30 @@ func Build(data []byte, px int, o Options) (Result, error) {
 	return Result{Rendered: render(small, nil), Accent: ac}, nil
 }
 
-// Placeholder is a dim gradient with a ♫ in the middle.
-func Placeholder(px int) Result {
+// Placeholder is a gradient from the terminal background towards the accent,
+// with a ♫ in the middle. An empty or invalid accent uses the default one.
+func Placeholder(px int, bg color.RGBA, accent string) Result {
+	ac := color.RGBA{0xc9, 0xa7, 0xff, 255}
+	if _, err := fmt.Sscanf(accent, "#%02x%02x%02x", &ac.R, &ac.G, &ac.B); err != nil {
+		ac = color.RGBA{0xc9, 0xa7, 0xff, 255}
+	}
 	img := image.NewRGBA(image.Rect(0, 0, px, px))
 	for y := 0; y < px; y++ {
 		for x := 0; x < px; x++ {
-			t := float64(x+y) / float64(2*px)
-			v := uint8(34 + 36*t)
-			img.Set(x, y, color.RGBA{v, v, v + 8, 255})
+			// brighter towards the bottom right, like a glow under the horizon
+			t := 0.10 + 0.30*float64(x+2*y)/float64(3*px)
+			img.Set(x, y, color.RGBA{
+				mixU8(bg.R, ac.R, t), mixU8(bg.G, ac.G, t), mixU8(bg.B, ac.B, t), 255})
 		}
 	}
 	roundCorners(img)
 	mid := px / 4
 	glyph := func(col, row int) (rune, bool) { return '♫', col == px/2 && row == mid }
 	return Result{Rendered: render(img, glyph), Accent: placeholderAccent}
+}
+
+func mixU8(a, b uint8, t float64) uint8 {
+	return uint8(float64(a) + (float64(b)-float64(a))*t + 0.5)
 }
 
 func cropSquare(src image.Image) image.Image {
